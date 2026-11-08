@@ -2,7 +2,7 @@ from math import atan2
 
 import numpy as np
 
-from string_art.nails import (
+from restring.nails import (
     create_circle_nail_positions,
     create_rectangle_nail_positions,
     scale_nails,

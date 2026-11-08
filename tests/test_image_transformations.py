@@ -1,6 +1,6 @@
 import numpy as np
 
-from string_art.image_transformations import largest_square, rgb2gray
+from restring.image_transformations import largest_square, rgb2gray
 
 
 def test_largest_square_crops_wide_image():

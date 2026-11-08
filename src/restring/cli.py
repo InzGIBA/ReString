@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.transform import resize
 
-from string_art.generator import Config, generate_bw, generate_rgb
-from string_art.image_transformations import largest_square
-from string_art.nails import create_circle_nail_positions, create_rectangle_nail_positions
+from restring.generator import Config, generate_bw, generate_rgb
+from restring.image_transformations import largest_square
+from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ LONG_SIDE = 300
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(description='Create String Art')
+    parser = argparse.ArgumentParser(description='Create string art with ReString')
     parser.add_argument('-i', action="store", dest="input_file")
     parser.add_argument('-o', action="store", dest="output_file", default="output.png")
     parser.add_argument('-d', action="store", type=int, dest="side_len", default=300)

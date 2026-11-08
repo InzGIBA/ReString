@@ -1,9 +1,9 @@
-from string_art.canvas import (
+from restring.canvas import (
     get_aa_line,
     init_canvas,
     pull_order_to_array_bw,
 )
-from string_art.nails import create_circle_nail_positions
+from restring.nails import create_circle_nail_positions
 
 
 def test_init_canvas_white_by_default():

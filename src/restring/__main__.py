@@ -1,4 +1,4 @@
-from string_art.cli import main
+from restring.cli import main
 
 if __name__ == "__main__":
     main()

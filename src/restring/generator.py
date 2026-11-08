@@ -4,14 +4,14 @@ from time import process_time
 
 import numpy as np
 
-from string_art.canvas import (
+from restring.canvas import (
     get_aa_line,
     init_canvas,
     pull_order_to_array_bw,
     pull_order_to_array_rgb,
 )
-from string_art.image_transformations import rgb2gray
-from string_art.nails import scale_nails
+from restring.image_transformations import rgb2gray
+from restring.nails import scale_nails
 
 logger = logging.getLogger(__name__)
 

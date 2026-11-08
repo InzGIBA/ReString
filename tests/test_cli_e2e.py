@@ -1,16 +1,16 @@
 import numpy as np
 
-import string_art
-from string_art.cli import build_parser
-from string_art.generator import Config, generate_bw
-from string_art.nails import create_circle_nail_positions
+import restring
+from restring.cli import build_parser
+from restring.generator import Config, generate_bw
+from restring.nails import create_circle_nail_positions
 
 
 def test_package_import_has_no_side_effects():
     # importing must neither parse CLI arguments nor configure logging
-    import string_art.cli as cli
+    import restring.cli as cli
 
-    assert string_art.__version__
+    assert restring.__version__
     assert not hasattr(cli, "args")
     assert not hasattr(cli, "parser")
 

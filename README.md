@@ -1,4 +1,4 @@
-# StringArt
+# ReString
 Project for algorithmics course 2020. Also submitted to DeltaX 2021. Recreate art by connecting nails with strings.
 
 For a quick overview of the project, look at the project's [poster](https://raw.githubusercontent.com/kaspar98/StringArt/main/docs/Algoritmika%20poster%20puhtand.pdf).
@@ -27,7 +27,7 @@ Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/pa
 
 ```
 ├── pyproject.toml       # PEP 621 metadata, dependencies, tool configs
-├── src/string_art/      # the installable package
+├── src/restring/        # the installable package
 │   ├── cli.py           # command line interface (entry point)
 │   ├── generator.py     # greedy algorithm and B/W + RGB pipelines
 │   ├── nails.py         # nail position creation and scaling
@@ -48,13 +48,13 @@ uv sync
 
 # Run from cmd
 ```bash
-uv run string-art -i <input.png> -o <output.png>
+uv run restring -i <input.png> -o <output.png>
 ```
 
 The same via module invocation:
 
 ```bash
-uv run python -m string_art -i <input.png> -o <output.png>
+uv run python -m restring -i <input.png> -o <output.png>
 ```
 
 Possible flags:
@@ -79,7 +79,7 @@ uv run pytest          # run the test suite
 uv run ruff check .    # lint
 ```
 
-The research notebooks in `notebooks/` import the package (`from string_art.image_transformations import *`), so run `uv sync` first.
+The research notebooks in `notebooks/` import the package (`from restring.image_transformations import *`), so run `uv sync` first.
 
 # Examples
 ![Ex1](https://raw.githubusercontent.com/kaspar98/StringArt/main/examples/Algoritmika%20fig%201.png)
