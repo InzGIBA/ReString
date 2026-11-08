@@ -54,8 +54,8 @@ toolchain to build the acceleration core (uv compiles it automatically):
 uv sync
 ```
 
-Without a Rust toolchain the greedy search falls back to a vectorized numpy
-implementation (dev dependency). See [docs/optimization.md](docs/optimization.md)
+Building from source requires a Rust toolchain (the core is the implementation,
+there is no pure-Python fallback). See [docs/optimization.md](docs/optimization.md)
 for benchmarks and a zig-based linker recipe for machines without a system
 C compiler.
 

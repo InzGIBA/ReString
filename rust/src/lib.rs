@@ -437,16 +437,47 @@ struct SourceLines {
     targets: Vec<u32>,
 }
 
+/// Deterministic splitmix64 — self-contained seeded RNG (no external crates).
+struct SplitMix64(u64);
+
+impl SplitMix64 {
+    fn next(&mut self) -> u64 {
+        self.0 = self.0.wrapping_add(0x9E3779B97F4A7C15);
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z ^ (z >> 31)
+    }
+}
+
+/// Deterministic random subset of `k` indices from `0..n` (Floyd's algorithm,
+/// returned in ascending order so tie-breaking matches the full scan).
+fn seeded_subset(n: usize, k: usize, seed: u64) -> Vec<usize> {
+    let mut rng = SplitMix64(seed);
+    let mut set = HashSet::new();
+    for j in (n - k)..n {
+        let t = (rng.next() % (j as u64 + 1)) as usize;
+        if set.contains(&t) {
+            set.insert(j);
+        } else {
+            set.insert(t);
+        }
+    }
+    let mut v: Vec<usize> = set.into_iter().collect();
+    v.sort_unstable();
+    v
+}
+
 /// Greedy pull-order search on the given grayscale target. Returns the pull
-/// order and the final working canvas. `subset` carries candidate indices
-/// pre-drawn on the Python side with numpy's default_rng(42).
-#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_subset=None, white=true))]
+/// order and the final working canvas. With `random_nails = Some(k)` only a
+/// fixed seeded subset of k candidates is scanned each iteration.
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true))]
 fn create_art(
     nails: Vec<(i64, i64)>,
     orig: &Image,
     strength: f64,
     i_limit: Option<u64>,
-    random_subset: Option<Vec<u64>>,
+    random_nails: Option<u64>,
     white: bool,
 ) -> PyResult<(Vec<u64>, Image)> {
     if orig.ch != 1 {
@@ -456,9 +487,9 @@ fn create_art(
     let n = nails.len();
     let flat = |r: i64, c: i64| (r as usize * w + c as usize) as u32;
 
-    let order: Vec<usize> = match &random_subset {
+    let order: Vec<usize> = match random_nails {
         None => (0..n).collect(),
-        Some(s) => s.iter().map(|&x| x as usize).collect(),
+        Some(k) => seeded_subset(n, k as usize, 42),
     };
 
     let mut sources: Vec<SourceLines> = Vec::with_capacity(n);

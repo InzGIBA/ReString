@@ -1,11 +1,8 @@
 from math import atan2
 
-import numpy as np
-
 from restring.nails import (
     create_circle_nail_positions,
     create_rectangle_nail_positions,
-    scale_nails,
 )
 
 
@@ -63,11 +60,3 @@ def test_circle_nails_stay_inside_canvas():
     for y, x in nails:
         assert 0 <= y < shape[0]
         assert 0 <= x < shape[1]
-
-
-def test_scale_nails_scales_y_then_x():
-    nails = np.array([(10, 20), (30, 40)])
-
-    scaled = scale_nails(0.5, 2, nails)  # (x_ratio, y_ratio)
-
-    assert scaled == [(20, 10), (60, 20)]
