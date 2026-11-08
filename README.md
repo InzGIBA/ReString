@@ -30,7 +30,7 @@ Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/pa
 ├── rust/                # Rust core (PyO3): greedy loop + line rasterizer
 ├── src/restring/        # the installable package
 │   ├── cli.py           # command line interface (entry point)
-│   ├── generator.py     # greedy algorithm (Rust core, numpy fallback)
+│   ├── generator.py     # greedy algorithm orchestration (Rust core)
 │   ├── nails.py         # nail position creation and scaling
 │   ├── canvas.py        # canvas init, AA line rasterizer, thread drawing
 │   ├── image_transformations.py  # rgb2gray, largest_square, resize
