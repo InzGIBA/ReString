@@ -1,8 +1,9 @@
 """Canvas and thread rendering.
 
-The pipeline is fully Rust: `init_canvas`, the line rasterizer and both
-renders live in `restring._core`. The numpy import below is lazy and
-dev-only (analysis-script helpers operating on numpy canvases).
+The pipeline is fully Rust and dependency-free: `init_canvas`, the line
+rasterizer and both renders live in `restring._core`. Nothing in this
+module (or the whole runtime package) imports numpy — that is guarded by
+tests/test_no_runtime_numpy.py.
 """
 
 from restring import _core
@@ -17,16 +18,6 @@ def init_canvas(shape, black=False):
 def line_aa(r0, c0, r1, c1):
     """Anti-aliased line — Zingl's Bresenham-based rasterizer (Rust core)."""
     return _core.line_aa(r0, c0, r1, c1)
-
-
-def get_aa_line(from_pos, to_pos, strength, picture):
-    """Overlay an AA line on a numpy canvas (analysis-script convenience)."""
-    import numpy as np
-
-    rr, cc, val = line_aa(from_pos[0], from_pos[1], to_pos[0], to_pos[1])
-    rr, cc, val = np.asarray(rr), np.asarray(cc), np.asarray(val)
-    line = np.clip(picture[rr, cc] + strength * val, 0, 1)
-    return line, rr, cc
 
 
 def pull_order_to_array_bw(order, canvas, nails, strength, shape=None):

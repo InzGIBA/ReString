@@ -30,8 +30,8 @@ from _bridge import image_to_numpy  # noqa: E402
 
 from restring import _core  # noqa: E402
 from restring.canvas import (  # noqa: E402
-    get_aa_line,
     init_canvas,
+    line_aa,
     pull_order_to_array_bw,
     pull_order_to_array_rgb,
 )
@@ -45,6 +45,15 @@ from restring.nails import create_circle_nail_positions  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 logger = logging.getLogger("quality_analysis")
+
+
+def get_aa_line(from_pos, to_pos, strength, picture):
+    """Overlay an AA line on a numpy canvas (this script's replay helper;
+    the runtime package itself is numpy-free)."""
+    rr, cc, val = line_aa(from_pos[0], from_pos[1], to_pos[0], to_pos[1])
+    rr, cc, val = np.asarray(rr), np.asarray(cc), np.asarray(val)
+    line = np.clip(picture[rr, cc] + strength * val, 0, 1)
+    return line, rr, cc
 
 LONG_SIDE = 300
 MAX_PULLS = 7000
