@@ -36,7 +36,7 @@ Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/pa
 ├── tests/               # pytest suite
 ├── notebooks/           # original research notebooks
 ├── examples/            # example outputs
-└── docs/                # project poster
+└── docs/                # project poster, quality analysis report
 ```
 
 # Installation
@@ -80,6 +80,10 @@ uv run ruff check .    # lint
 ```
 
 The research notebooks in `notebooks/` import the package (`from restring.image_transformations import *`), so run `uv sync` first.
+
+See [docs/quality_analysis.md](docs/quality_analysis.md) for the pull-count quality analysis:
+when a picture reaches its best quality, when it starts degrading, and how to pick `-s` for
+a target number of thread pulls (e.g. 3000-7000 pulls need `-s 0.05`).
 
 # Photo credits
 The portrait photos used in the test suite (`tests/data/`) come from
