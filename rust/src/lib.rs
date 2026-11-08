@@ -468,32 +468,12 @@ fn seeded_subset(n: usize, k: usize, seed: u64) -> Vec<usize> {
     v
 }
 
-/// Greedy pull-order search on the given grayscale target. Returns the pull
-/// order and the final working canvas. With `random_nails = Some(k)` only a
-/// fixed seeded subset of k candidates is scanned each iteration.
-#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true))]
-fn create_art(
-    nails: Vec<(i64, i64)>,
-    orig: &Image,
-    strength: f64,
-    i_limit: Option<u64>,
-    random_nails: Option<u64>,
-    white: bool,
-) -> PyResult<(Vec<u64>, Image)> {
-    if orig.ch != 1 {
-        return Err(PyValueError::new_err("create_art needs a grayscale target"));
-    }
-    let (w, h) = (orig.w, orig.h);
+/// Build the line cache for a chunk of source nails (parallelizable unit).
+fn build_sources(nails: &[(i64, i64)], range: std::ops::Range<usize>, w: usize) -> Vec<SourceLines> {
     let n = nails.len();
     let flat = |r: i64, c: i64| (r as usize * w + c as usize) as u32;
-
-    let order: Vec<usize> = match random_nails {
-        None => (0..n).collect(),
-        Some(k) => seeded_subset(n, k as usize, 42),
-    };
-
-    let mut sources: Vec<SourceLines> = Vec::with_capacity(n);
-    for i in 0..n {
+    let mut sources = Vec::with_capacity(range.len());
+    for i in range {
         let mut sl = SourceLines {
             flat_idx: Vec::new(),
             val: Vec::new(),
@@ -513,6 +493,62 @@ fn create_art(
             sl.targets.push(j as u32);
         }
         sources.push(sl);
+    }
+    sources
+}
+
+/// Greedy pull-order search on the given grayscale target. Returns the pull
+/// order and the final working canvas. With `random_nails = Some(k)` only a
+/// fixed seeded subset of k candidates is scanned each iteration.
+///
+/// The line cache is rasterized in parallel (result-preserving: each line is
+/// deterministic, chunks are reassembled in source order).
+///
+/// An incremental improvement cache was evaluated here and rejected — see
+/// docs/optimization.md (stage 7): with canvas-crossing chords the per-line
+/// invalidation fan-out rivals the full rescan cost, so the cache measured
+/// 0.4-0.6x of the plain scan throughput.
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true))]
+fn create_art(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    strength: f64,
+    i_limit: Option<u64>,
+    random_nails: Option<u64>,
+    white: bool,
+) -> PyResult<(Vec<u64>, Image)> {
+    if orig.ch != 1 {
+        return Err(PyValueError::new_err("create_art needs a grayscale target"));
+    }
+    let (w, h) = (orig.w, orig.h);
+    let n = nails.len();
+
+    let order: Vec<usize> = match random_nails {
+        None => (0..n).collect(),
+        Some(k) => seeded_subset(n, k as usize, 42),
+    };
+
+    // parallel rasterization across sources
+    let workers = std::thread::available_parallelism()
+        .map(|v| v.get())
+        .unwrap_or(1)
+        .min(n)
+        .max(1);
+    let chunk = (n + workers - 1) / workers;
+    let mut chunks: Vec<Vec<SourceLines>> = Vec::new();
+    std::thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for start in (0..n).step_by(chunk) {
+            let nails_ref = &nails;
+            handles.push(scope.spawn(move || build_sources(nails_ref, start..(start + chunk).min(n), w)));
+        }
+        for handle in handles {
+            chunks.push(handle.join().expect("line cache worker panicked"));
+        }
+    });
+    let mut sources = Vec::with_capacity(n);
+    for mut chunk_sources in chunks {
+        sources.append(&mut chunk_sources);
     }
 
     let mut pic = vec![if white { 1.0 } else { 0.0 }; w * h];
