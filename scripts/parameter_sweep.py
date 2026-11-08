@@ -301,8 +301,49 @@ def sweep_darken():
     dump("darken", results)
 
 
+def sweep_rectlong():
+    """Experiments the pre-Rust stack could not afford:
+
+    1. --rect saturation: one 7000-iteration run on rect nails (-n 4),
+       render prefixes at s=0.05 — where does the layout saturate?
+    2. rect + -n 2 (~600 nails) at 4000 iterations — the combination the
+       old report listed as untested.
+    """
+    results = {}
+    for tag, path in PHOTOS.items():
+        ref_np = load_photo_np(path)
+        ref = load_photo(path)
+        rows = []
+        for label, step, budget in (("rect_n4", 4, 7000), ("rect_n2", 2, 4000)):
+            nails = create_rectangle_nail_positions((SIDE, SIDE), nail_step=step)
+            t0 = time.perf_counter()
+            order, _ = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=budget)
+            dt = time.perf_counter() - t0
+            ns = [n for n in PULL_SNAPSHOTS if n < len(order)]
+            curve = [{"n": n, "mse": mse(render_np(order[: n + 1], nails, SIDE, 0.05), ref_np)}
+                     for n in ns]
+            rows.append({"label": label, "nails": len(nails), "time_s": dt,
+                         "threads": len(order) - 1, "curve": curve})
+            print(f"rectlong {tag} {label}: {len(nails)} nails, {len(order)-1} threads, {dt:.1f}s")
+        results[tag] = rows
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    for ax, (tag, rows) in zip(axes, results.items()):
+        for row in rows:
+            ax.plot([x["n"] for x in row["curve"]], [x["mse"] for x in row["curve"]],
+                    "o-", label=f"{row['label']} ({row['nails']} гв.)")
+        ax.set_xscale("log")
+        ax.set_xlabel("число нитей (лог.)")
+        ax.set_ylabel("MSE (сила 0.05)")
+        ax.set_title(f"{tag}: насыщение прямоугольной раскладки")
+        ax.legend(fontsize=8)
+    savefig(fig, "rect_long.png")
+    dump("rect_long", results)
+
+
 SWEEPS = {"pulls": sweep_pulls, "nails": sweep_nails, "random": sweep_random,
-          "dims": sweep_dims, "layout": sweep_layout, "darken": sweep_darken}
+          "dims": sweep_dims, "layout": sweep_layout, "darken": sweep_darken,
+          "rectlong": sweep_rectlong}
 
 
 def main():
