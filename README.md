@@ -23,7 +23,7 @@ The algorithm:<br>
 *² The number of iterations can be set manually or the algorithm can be set to repeat until it fails to find string pulls that improve the total result.<br>
 
 # Project structure
-Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/packaging-projects/) packaged with [Poetry](https://python-poetry.org/):
+Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/packaging-projects/) managed with [uv](https://docs.astral.sh/uv/):
 
 ```
 ├── pyproject.toml       # PEP 621 metadata, dependencies, tool configs
@@ -40,21 +40,21 @@ Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/pa
 ```
 
 # Installation
-Requires Python 3.11+ and [Poetry](https://python-poetry.org/):
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) (it manages the Python 3.11+ interpreter itself):
 
 ```bash
-poetry install
+uv sync
 ```
 
 # Run from cmd
 ```bash
-poetry run string-art -i <input.png> -o <output.png>
+uv run string-art -i <input.png> -o <output.png>
 ```
 
 The same via module invocation:
 
 ```bash
-poetry run python -m string_art -i <input.png> -o <output.png>
+uv run python -m string_art -i <input.png> -o <output.png>
 ```
 
 Possible flags:
@@ -75,11 +75,11 @@ Nails are placed evenly around the perimeter. For circles the first nail is plac
 
 # Development
 ```bash
-poetry run pytest          # run the test suite
-poetry run ruff check .    # lint
+uv run pytest          # run the test suite
+uv run ruff check .    # lint
 ```
 
-The research notebooks in `notebooks/` import the package (`from string_art.image_transformations import *`), so run `poetry install` first.
+The research notebooks in `notebooks/` import the package (`from string_art.image_transformations import *`), so run `uv sync` first.
 
 # Examples
 ![Ex1](https://raw.githubusercontent.com/kaspar98/StringArt/main/examples/Algoritmika%20fig%201.png)
