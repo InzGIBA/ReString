@@ -1,8 +1,11 @@
 """Canvas and thread rendering.
 
-`line_aa` is the pure-Python reference port of skimage's Zingl rasterizer —
-kept for tests and analysis scripts; the runtime pipeline uses the identical
-Rust implementation. The render helpers delegate to the Rust core.
+The runtime pipeline is fully Rust: `init_canvas`, `pull_order_to_array_*`
+and the line rasterization inside `create_art`/renders all live in
+`restring._core`. `line_aa` below is the pure-Python *reference port* of
+skimage's Zingl rasterizer — its only callers are the Rust-equivalence tests
+(`tests/test_rust_core.py`); numpy appears solely in lazy, dev-only imports
+(analysis-script helpers and the generator fallback when `_core` is absent).
 """
 
 from restring import _core
@@ -65,10 +68,14 @@ def init_canvas(shape, black=False):
 
 
 def get_aa_line(from_pos, to_pos, strength, picture):
-    """Overlay an AA line on a numpy canvas (analysis-script convenience)."""
+    """Overlay an AA line on a numpy canvas (analysis-script convenience).
+
+    Rasterizes via the Rust core (the Python `line_aa` below is the test
+    reference, not a runtime path).
+    """
     import numpy as np
 
-    rr, cc, val = line_aa(from_pos[0], from_pos[1], to_pos[0], to_pos[1])
+    rr, cc, val = _core.line_aa(from_pos[0], from_pos[1], to_pos[0], to_pos[1])
     rr, cc, val = np.asarray(rr), np.asarray(cc), np.asarray(val)
     line = np.clip(picture[rr, cc] + strength * val, 0, 1)
     return line, rr, cc
