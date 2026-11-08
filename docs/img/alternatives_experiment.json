@@ -1,0 +1,132 @@
+{
+ "male": [
+  {
+   "config": "greedy_500",
+   "time_s": 0.15,
+   "threads": 500,
+   "mse": 0.1703,
+   "center_mse": 0.1866
+  },
+  {
+   "config": "greedy_2000",
+   "time_s": 0.45,
+   "threads": 2000,
+   "mse": 0.0291,
+   "center_mse": 0.0257
+  },
+  {
+   "config": "weighted_500",
+   "time_s": 0.2,
+   "threads": 500,
+   "mse": 0.1756,
+   "center_mse": 0.1339
+  },
+  {
+   "config": "weighted_2000",
+   "time_s": 0.68,
+   "threads": 2000,
+   "mse": 0.0299,
+   "center_mse": 0.0196
+  },
+  {
+   "config": "asym_500",
+   "time_s": 0.21,
+   "threads": 500,
+   "mse": 0.1703,
+   "center_mse": 0.1847
+  },
+  {
+   "config": "asym_2000",
+   "time_s": 0.72,
+   "threads": 2000,
+   "mse": 0.0296,
+   "center_mse": 0.0264
+  },
+  {
+   "config": "multiscale_500",
+   "time_s": 0.13,
+   "threads": 300,
+   "mse": 0.2098,
+   "center_mse": 0.2768
+  },
+  {
+   "config": "multiscale_2000",
+   "time_s": 0.51,
+   "threads": 1444,
+   "mse": 0.1523,
+   "center_mse": 0.2354
+  },
+  {
+   "config": "local_search_500+2s",
+   "time_s": 0.36,
+   "threads": 502,
+   "mse": 0.17,
+   "center_mse": 0.1864
+  }
+ ],
+ "female": [
+  {
+   "config": "greedy_500",
+   "time_s": 0.14,
+   "threads": 500,
+   "mse": 0.1701,
+   "center_mse": 0.2669
+  },
+  {
+   "config": "greedy_2000",
+   "time_s": 0.42,
+   "threads": 2000,
+   "mse": 0.0303,
+   "center_mse": 0.03
+  },
+  {
+   "config": "weighted_500",
+   "time_s": 0.2,
+   "threads": 500,
+   "mse": 0.1711,
+   "center_mse": 0.2481
+  },
+  {
+   "config": "weighted_2000",
+   "time_s": 0.68,
+   "threads": 2000,
+   "mse": 0.0312,
+   "center_mse": 0.0225
+  },
+  {
+   "config": "asym_500",
+   "time_s": 0.2,
+   "threads": 500,
+   "mse": 0.1701,
+   "center_mse": 0.2679
+  },
+  {
+   "config": "asym_2000",
+   "time_s": 0.69,
+   "threads": 2000,
+   "mse": 0.0309,
+   "center_mse": 0.0347
+  },
+  {
+   "config": "multiscale_500",
+   "time_s": 0.13,
+   "threads": 300,
+   "mse": 0.2111,
+   "center_mse": 0.3872
+  },
+  {
+   "config": "multiscale_2000",
+   "time_s": 0.49,
+   "threads": 948,
+   "mse": 0.1789,
+   "center_mse": 0.3467
+  },
+  {
+   "config": "local_search_500+2s",
+   "time_s": 0.35,
+   "threads": 502,
+   "mse": 0.1697,
+   "center_mse": 0.2662
+  }
+ ]
+}

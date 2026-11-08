@@ -619,6 +619,309 @@ fn create_art(
 }
 
 // ---------------------------------------------------------------------------
+// Experimental lookahead searches: beam width, receding horizon (MPC)
+// ---------------------------------------------------------------------------
+
+/// One beam hypothesis: a partial pull sequence with its own working canvas.
+struct BeamState {
+    pic: Vec<f64>,
+    current: usize,
+    score: f64,
+    order: Vec<u64>,
+}
+
+/// Scan every candidate pull from `state`. Read-only against the canvas.
+fn scan_candidates(
+    sources: &[SourceLines],
+    order: &[usize],
+    n: usize,
+    orig: &[f64],
+    strength: f64,
+    state: &BeamState,
+) -> Vec<(f64, u32, usize, usize)> {
+    let sl = &sources[state.current];
+    let mut out = Vec::with_capacity(order.len());
+    for &cand in order {
+        if cand == state.current || cand >= n {
+            continue;
+        }
+        let seg = match sl.targets.binary_search(&(cand as u32)) {
+            Ok(pos) => pos,
+            Err(_) => continue,
+        };
+        let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+        let mut improvement = 0.0f64;
+        for k in s0..s1 {
+            let px = sl.flat_idx[k] as usize;
+            let cur = state.pic[px];
+            let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
+            let o = orig[px];
+            improvement += (cur - o) * (cur - o) - (new - o) * (new - o);
+        }
+        out.push((improvement, cand as u32, s0, s1));
+    }
+    out
+}
+
+fn apply_line(sl: &SourceLines, pic: &mut [f64], s0: usize, s1: usize, strength: f64) {
+    for k in s0..s1 {
+        let px = sl.flat_idx[k] as usize;
+        pic[px] = (pic[px] + strength * sl.val[k]).clamp(0.0, 1.0);
+    }
+}
+
+/// Offer a candidate to a descending top-W list. Later candidates win ties,
+/// which reproduces the greedy `>=` tie-break when W == 1.
+fn offer_top_w(
+    top: &mut Vec<(f64, usize, u32, usize, usize)>,
+    item: (f64, usize, u32, usize, usize),
+    w: usize,
+) {
+    if top.len() < w {
+        top.push(item);
+        top.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        return;
+    }
+    let worst = w - 1;
+    if item.0 >= top[worst].0 {
+        top[worst] = item;
+        let mut i = worst;
+        while i > 0 && top[i - 1].0 < top[i].0 {
+            top.swap(i - 1, i);
+            i -= 1;
+        }
+    }
+}
+
+fn fork_states(
+    sources: &[SourceLines],
+    states: &[BeamState],
+    top: &[(f64, usize, u32, usize, usize)],
+    strength: f64,
+) -> Vec<BeamState> {
+    let mut next = Vec::with_capacity(top.len());
+    for &(total, si, target, s0, s1) in top {
+        let parent = &states[si];
+        let mut pic = parent.pic.clone();
+        apply_line(&sources[parent.current], &mut pic, s0, s1, strength);
+        let mut order_seq = parent.order.clone();
+        order_seq.push(target as u64);
+        next.push(BeamState {
+            pic,
+            current: target as usize,
+            score: total,
+            order: order_seq,
+        });
+    }
+    next
+}
+
+fn best_base_score(states: &[BeamState]) -> f64 {
+    states
+        .iter()
+        .map(|s| s.score)
+        .fold(f64::NEG_INFINITY, f64::max)
+}
+
+/// Shared parallel line-cache builder (the same rasterizer create_art uses).
+fn build_cache(nails: &[(i64, i64)], w: usize) -> Vec<SourceLines> {
+    let n = nails.len();
+    let workers = std::thread::available_parallelism()
+        .map(|v| v.get())
+        .unwrap_or(1)
+        .min(n)
+        .max(1);
+    let chunk = (n + workers - 1) / workers;
+    let mut chunks: Vec<Vec<SourceLines>> = Vec::new();
+    std::thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for start in (0..n).step_by(chunk) {
+            let nails_ref = nails;
+            handles.push(scope.spawn(move || build_sources(nails_ref, start..(start + chunk).min(n), w)));
+        }
+        for handle in handles {
+            chunks.push(handle.join().expect("line cache worker panicked"));
+        }
+    });
+    let mut sources = Vec::with_capacity(n);
+    for mut chunk_sources in chunks {
+        sources.append(&mut chunk_sources);
+    }
+    sources
+}
+
+/// Beam search over pull sequences. Width 1 reproduces create_art bit for
+/// bit. Larger widths keep W parallel futures competing on cumulative
+/// improvement. Returns the best final hypothesis.
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, beam=1))]
+fn beam_search(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    strength: f64,
+    i_limit: Option<u64>,
+    random_nails: Option<u64>,
+    white: bool,
+    beam: u16,
+) -> PyResult<(Vec<u64>, Image)> {
+    if orig.ch != 1 {
+        return Err(PyValueError::new_err("beam_search needs a grayscale target"));
+    }
+    let (w, h) = (orig.w, orig.h);
+    let n = nails.len();
+    let width = (beam as usize).max(1);
+
+    let order: Vec<usize> = match random_nails {
+        None => (0..n).collect(),
+        Some(k) => seeded_subset(n, k as usize, 42),
+    };
+    let sources = build_cache(&nails, w);
+
+    let mut states = vec![BeamState {
+        pic: vec![if white { 1.0 } else { 0.0 }; w * h],
+        current: 0,
+        score: 0.0,
+        order: vec![0],
+    }];
+
+    let mut i = 0u64;
+    let mut fails = 0u32;
+
+    loop {
+        i += 1;
+        match i_limit {
+            None => {
+                if fails >= 3 {
+                    break;
+                }
+            }
+            Some(limit) => {
+                if i > limit {
+                    break;
+                }
+            }
+        }
+
+        let mut top: Vec<(f64, usize, u32, usize, usize)> = Vec::with_capacity(width);
+        for (si, state) in states.iter().enumerate() {
+            for (imp, target, s0, s1) in
+                scan_candidates(&sources, &order, n, &orig.data, strength, state)
+            {
+                offer_top_w(&mut top, (state.score + imp, si, target, s0, s1), width);
+            }
+        }
+
+        let best_total = top.first().map(|t| t.0).unwrap_or(f64::NEG_INFINITY);
+        if best_total <= best_base_score(&states) {
+            fails += 1;
+            continue;
+        }
+
+        states = fork_states(&sources, &states, &top, strength);
+    }
+
+    let best = states
+        .iter()
+        .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
+        .unwrap();
+    Ok((best.order.clone(), Image { data: best.pic.clone(), w, h, ch: 1 }))
+}
+
+/// Receding-horizon search (MPC / rollout style). For every committed pull,
+/// expand a beam of `beam` hypotheses for `horizon` steps ahead, then commit
+/// only the first pull of the best final hypothesis and slide the horizon.
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, horizon=100, beam=8, random_nails=None, white=true))]
+fn horizon_search(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    strength: f64,
+    i_limit: Option<u64>,
+    horizon: u32,
+    beam: u16,
+    random_nails: Option<u64>,
+    white: bool,
+) -> PyResult<(Vec<u64>, Image)> {
+    if orig.ch != 1 {
+        return Err(PyValueError::new_err("horizon_search needs a grayscale target"));
+    }
+    let (w, h) = (orig.w, orig.h);
+    let n = nails.len();
+    let width = (beam as usize).max(1);
+
+    let order: Vec<usize> = match random_nails {
+        None => (0..n).collect(),
+        Some(k) => seeded_subset(n, k as usize, 42),
+    };
+    let sources = build_cache(&nails, w);
+
+    let mut pic = vec![if white { 1.0 } else { 0.0 }; w * h];
+    let mut pull_order: Vec<u64> = vec![0];
+    let mut current = 0usize;
+
+    let mut i = 0u64;
+    let mut fails = 0u32;
+
+    loop {
+        i += 1;
+        match i_limit {
+            None => {
+                if fails >= 3 {
+                    break;
+                }
+            }
+            Some(limit) => {
+                if i > limit {
+                    break;
+                }
+            }
+        }
+
+        // roll the beam `horizon` steps into the future from (pic, current)
+        let mut states = vec![BeamState {
+            pic: pic.clone(),
+            current,
+            score: 0.0,
+            order: Vec::new(),
+        }];
+        for _ in 0..horizon {
+            let mut top: Vec<(f64, usize, u32, usize, usize)> = Vec::with_capacity(width);
+            for (si, state) in states.iter().enumerate() {
+                for (imp, target, s0, s1) in
+                    scan_candidates(&sources, &order, n, &orig.data, strength, state)
+                {
+                    offer_top_w(&mut top, (state.score + imp, si, target, s0, s1), width);
+                }
+            }
+            if top.is_empty() || top[0].0 <= best_base_score(&states) {
+                break;
+            }
+            states = fork_states(&sources, &states, &top, strength);
+        }
+
+        let best = states
+            .iter()
+            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap())
+            .unwrap();
+        match best.order.first().copied() {
+            Some(target) if best.score > 0.0 => {
+                let sl = &sources[current];
+                if let Ok(seg) = sl.targets.binary_search(&(target as u32)) {
+                    let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+                    apply_line(sl, &mut pic, s0, s1, strength);
+                }
+                pull_order.push(target);
+                current = target as usize;
+            }
+            _ => {
+                fails += 1;
+            }
+        }
+    }
+
+    Ok((pull_order, Image { data: pic, w, h, ch: 1 }))
+}
+
+
+// ---------------------------------------------------------------------------
 // Renders (ports of restring.canvas.pull_order_to_array_*)
 // ---------------------------------------------------------------------------
 
@@ -783,8 +1086,350 @@ fn same_shape(a: &Image, b: &Image) -> PyResult<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Module
+// Experimental: alternatives to plain greedy (importance, asymmetric,
+// multi-scale, add/remove local search)
 // ---------------------------------------------------------------------------
+
+/// Scan with a per-pixel weight map. The improvement of each candidate pull
+/// is multiplied by the weight of each pixel, concentrating threads where
+/// the weight is high.
+fn scan_candidates_weighted(
+    sources: &[SourceLines],
+    order: &[usize],
+    n: usize,
+    orig: &[f64],
+    weights: &[f64],
+    strength: f64,
+    state: &BeamState,
+) -> Vec<(f64, u32, usize, usize)> {
+    let sl = &sources[state.current];
+    let mut out = Vec::with_capacity(order.len());
+    for &cand in order {
+        if cand == state.current || cand >= n {
+            continue;
+        }
+        let seg = match sl.targets.binary_search(&(cand as u32)) {
+            Ok(pos) => pos,
+            Err(_) => continue,
+        };
+        let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+        let mut improvement = 0.0f64;
+        for k in s0..s1 {
+            let px = sl.flat_idx[k] as usize;
+            let cur = state.pic[px];
+            let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
+            let o = orig[px];
+            improvement += weights[px] * ((cur - o) * (cur - o) - (new - o) * (new - o));
+        }
+        out.push((improvement, cand as u32, s0, s1));
+    }
+    out
+}
+
+/// Importance-weighted greedy search. Same pipeline as create_art, but each
+/// pixel's error contribution is multiplied by a weight. Higher weights
+/// attract more threads to the region.
+#[pyfunction(signature = (nails, orig, weights, strength, i_limit=None, white=true))]
+fn weighted_search(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    weights: &Image,
+    strength: f64,
+    i_limit: Option<u64>,
+    white: bool,
+) -> PyResult<(Vec<u64>, Image)> {
+    if orig.ch != 1 || weights.ch != 1 {
+        return Err(PyValueError::new_err("weighted_search needs grayscale images"));
+    }
+    if orig.w != weights.w || orig.h != weights.h {
+        return Err(PyValueError::new_err("orig and weights must have the same shape"));
+    }
+    let (w, h) = (orig.w, orig.h);
+    let n = nails.len();
+    let order: Vec<usize> = (0..n).collect();
+    let sources = build_cache(&nails, w);
+
+    let mut state = BeamState {
+        pic: vec![if white { 1.0 } else { 0.0 }; w * h],
+        current: 0,
+        score: 0.0,
+        order: vec![0],
+    };
+
+    let mut i = 0u64;
+    let mut fails = 0u32;
+    loop {
+        i += 1;
+        match i_limit {
+            None => { if fails >= 3 { break; } }
+            Some(limit) => { if i > limit { break; } }
+        }
+
+        let mut best: (f64, u32, usize, usize) = (f64::NEG_INFINITY, 0, 0, 0);
+        for (imp, target, s0, s1) in scan_candidates_weighted(
+            &sources, &order, n, &orig.data, &weights.data, strength, &state,
+        ) {
+            if imp >= best.0 {
+                best = (imp, target, s0, s1);
+            }
+        }
+        if best.0 <= 0.0 { fails += 1; continue; }
+
+        state.order.push(best.1 as u64);
+        apply_line(&sources[state.current], &mut state.pic, best.2, best.3, strength);
+        state.current = best.1 as usize;
+    }
+    Ok((state.order, Image { data: state.pic, w, h, ch: 1 }))
+}
+
+/// Scan with asymmetric error penalties. Over-darkening (new < orig) is
+/// penalized alpha times more than under-darkening.
+fn scan_candidates_asymmetric(
+    sources: &[SourceLines],
+    order: &[usize],
+    n: usize,
+    orig: &[f64],
+    alpha: f64,
+    strength: f64,
+    state: &BeamState,
+) -> Vec<(f64, u32, usize, usize)> {
+    let sl = &sources[state.current];
+    let mut out = Vec::with_capacity(order.len());
+    let penalty = |diff: f64, alpha: f64| -> f64 {
+        if diff < 0.0 { alpha * diff * diff } else { diff * diff }
+    };
+    for &cand in order {
+        if cand == state.current || cand >= n {
+            continue;
+        }
+        let seg = match sl.targets.binary_search(&(cand as u32)) {
+            Ok(pos) => pos,
+            Err(_) => continue,
+        };
+        let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+        let mut improvement = 0.0f64;
+        for k in s0..s1 {
+            let px = sl.flat_idx[k] as usize;
+            let cur = state.pic[px];
+            let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
+            let o = orig[px];
+            improvement += penalty(cur - o, alpha) - penalty(new - o, alpha);
+        }
+        out.push((improvement, cand as u32, s0, s1));
+    }
+    out
+}
+
+/// Asymmetric-penalty greedy search. Over-darkening costs alpha times more
+/// than under-darkening, preserving bright details.
+#[pyfunction(signature = (nails, orig, alpha, strength, i_limit=None, white=true))]
+fn asymmetric_search(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    alpha: f64,
+    strength: f64,
+    i_limit: Option<u64>,
+    white: bool,
+) -> PyResult<(Vec<u64>, Image)> {
+    if orig.ch != 1 {
+        return Err(PyValueError::new_err("asymmetric_search needs a grayscale target"));
+    }
+    let (w, h) = (orig.w, orig.h);
+    let n = nails.len();
+    let order: Vec<usize> = (0..n).collect();
+    let sources = build_cache(&nails, w);
+
+    let mut state = BeamState {
+        pic: vec![if white { 1.0 } else { 0.0 }; w * h],
+        current: 0,
+        score: 0.0,
+        order: vec![0],
+    };
+
+    let mut i = 0u64;
+    let mut fails = 0u32;
+    loop {
+        i += 1;
+        match i_limit {
+            None => { if fails >= 3 { break; } }
+            Some(limit) => { if i > limit { break; } }
+        }
+
+        let mut best: (f64, u32, usize, usize) = (f64::NEG_INFINITY, 0, 0, 0);
+        for (imp, target, s0, s1) in scan_candidates_asymmetric(
+            &sources, &order, n, &orig.data, alpha, strength, &state,
+        ) {
+            if imp >= best.0 {
+                best = (imp, target, s0, s1);
+            }
+        }
+        if best.0 <= 0.0 { fails += 1; continue; }
+
+        state.order.push(best.1 as u64);
+        apply_line(&sources[state.current], &mut state.pic, best.2, best.3, strength);
+        state.current = best.1 as usize;
+    }
+    Ok((state.order, Image { data: state.pic, w, h, ch: 1 }))
+}
+
+/// Greedy search starting from an existing canvas state (for multi-scale).
+/// The initial canvas is the result of a previous coarse pass.
+#[pyfunction(signature = (nails, orig, initial_pic, strength, i_limit=None, white=true))]
+fn create_art_from(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    initial_pic: &Image,
+    strength: f64,
+    i_limit: Option<u64>,
+    white: bool,
+) -> PyResult<(Vec<u64>, Image)> {
+    if orig.ch != 1 || initial_pic.ch != 1 {
+        return Err(PyValueError::new_err("create_art_from needs grayscale images"));
+    }
+    if orig.w != initial_pic.w || orig.h != initial_pic.h {
+        return Err(PyValueError::new_err("orig and initial_pic must have the same shape"));
+    }
+    let (w, h) = (orig.w, orig.h);
+    let n = nails.len();
+    let order: Vec<usize> = (0..n).collect();
+    let sources = build_cache(&nails, w);
+
+    let mut state = BeamState {
+        pic: initial_pic.data.clone(),
+        current: 0,
+        score: 0.0,
+        order: vec![0],
+    };
+
+    let mut i = 0u64;
+    let mut fails = 0u32;
+    loop {
+        i += 1;
+        match i_limit {
+            None => { if fails >= 3 { break; } }
+            Some(limit) => { if i > limit { break; } }
+        }
+
+        let mut best: (f64, u32, usize, usize) = (f64::NEG_INFINITY, 0, 0, 0);
+        for (imp, target, s0, s1) in scan_candidates(
+            &sources, &order, n, &orig.data, strength, &state,
+        ) {
+            if imp >= best.0 {
+                best = (imp, target, s0, s1);
+            }
+        }
+        if best.0 <= 0.0 { fails += 1; continue; }
+
+        state.order.push(best.1 as u64);
+        apply_line(&sources[state.current], &mut state.pic, best.2, best.3, strength);
+        state.current = best.1 as usize;
+    }
+    Ok((state.order, Image { data: state.pic, w, h, ch: 1 }))
+}
+
+/// Add/remove local search on a completed pull order. For `sweeps` rounds:
+/// try removing each pull (rebuild canvas without it), keep removals that
+/// improve MSE. Then try adding the best new pull at each gap position.
+#[pyfunction(signature = (nails, orig, pull_order, strength, sweeps=2))]
+fn local_search(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    pull_order: Vec<u64>,
+    strength: f64,
+    sweeps: u32,
+) -> PyResult<(Vec<u64>, Image)> {
+    if orig.ch != 1 {
+        return Err(PyValueError::new_err("local_search needs a grayscale target"));
+    }
+    let (w, h) = (orig.w, orig.h);
+    let n = nails.len();
+    let sources = build_cache(&nails, w);
+    let order: Vec<usize> = (0..n).collect();
+
+    let mut current_order = pull_order;
+
+    let canvas_mse = |order: &[u64]| -> f64 {
+        let mut pic = vec![1.0f64; w * h];
+        let mut current = order[0] as usize;
+        for &target in &order[1..] {
+            let sl = &sources[current];
+            if let Ok(seg) = sl.targets.binary_search(&(target as u32)) {
+                let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+                apply_line(sl, &mut pic, s0, s1, strength);
+            }
+            current = target as usize;
+        }
+        let mut sum = 0.0;
+        for px in 0..w * h {
+            let d = pic[px] - orig.data[px];
+            sum += d * d;
+        }
+        sum
+    };
+
+    for _sweep in 0..sweeps {
+        let baseline = canvas_mse(&current_order);
+        let mut improved = false;
+
+        // removal pass: try dropping each pull (except the first anchor)
+        let mut i = 1;
+        while i < current_order.len() {
+            let mut trial = current_order.clone();
+            trial.remove(i);
+            let trial_mse = canvas_mse(&trial);
+            if trial_mse < baseline * 0.9999 {
+                current_order = trial;
+                improved = true;
+                // don't advance i, try removing the next one at same position
+            } else {
+                i += 1;
+            }
+        }
+
+        // addition pass: find the best pull to append
+        let pic_after = {
+            let mut pic = vec![1.0f64; w * h];
+            let mut current = current_order[0] as usize;
+            for &target in &current_order[1..] {
+                let sl = &sources[current];
+                if let Ok(seg) = sl.targets.binary_search(&(target as u32)) {
+                    let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+                    apply_line(sl, &mut pic, s0, s1, strength);
+                }
+                current = target as usize;
+            }
+            pic
+        };
+        let state = BeamState { pic: pic_after, current: current_order.last().copied().unwrap_or(0) as usize, score: 0.0, order: Vec::new() };
+        let mut best: (f64, u32) = (f64::NEG_INFINITY, 0);
+        for (imp, target, _, _) in scan_candidates(&sources, &order, n, &orig.data, strength, &state) {
+            if imp > best.0 {
+                best = (imp, target);
+            }
+        }
+        if best.0 > 0.0 {
+            current_order.push(best.1 as u64);
+            improved = true;
+        }
+
+        if !improved {
+            break;
+        }
+    }
+
+    // rebuild final canvas
+    let mut pic = vec![1.0f64; w * h];
+    let mut current = current_order[0] as usize;
+    for &target in &current_order[1..] {
+        let sl = &sources[current];
+        if let Ok(seg) = sl.targets.binary_search(&(target as u32)) {
+            let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+            apply_line(sl, &mut pic, s0, s1, strength);
+        }
+        current = target as usize;
+    }
+    Ok((current_order, Image { data: pic, w, h, ch: 1 }))
+}
 
 #[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -792,6 +1437,12 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(circle_nails, m)?)?;
     m.add_function(wrap_pyfunction!(rect_nails, m)?)?;
     m.add_function(wrap_pyfunction!(create_art, m)?)?;
+    m.add_function(wrap_pyfunction!(beam_search, m)?)?;
+    m.add_function(wrap_pyfunction!(horizon_search, m)?)?;
+    m.add_function(wrap_pyfunction!(weighted_search, m)?)?;
+    m.add_function(wrap_pyfunction!(asymmetric_search, m)?)?;
+    m.add_function(wrap_pyfunction!(create_art_from, m)?)?;
+    m.add_function(wrap_pyfunction!(local_search, m)?)?;
     m.add_function(wrap_pyfunction!(render_bw, m)?)?;
     m.add_function(wrap_pyfunction!(render_rgb, m)?)?;
     m.add_function(wrap_pyfunction!(mse, m)?)?;
