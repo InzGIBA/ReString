@@ -1,6 +1,6 @@
 [project]
 name = "restring"
-version = "0.1.0"
+version = "1.0.0"
 description = "Recreate images by connecting nails with strings using a greedy algorithm (B/W and RGB)"
 authors = [
     { name = "Kaspar Valk" },
