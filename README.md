@@ -84,6 +84,8 @@ The research notebooks in `notebooks/` import the package (`from restring.image_
 See [docs/quality_analysis.md](docs/quality_analysis.md) for the pull-count quality analysis:
 when a picture reaches its best quality, when it starts degrading, and how to pick `-s` for
 a target number of thread pulls (e.g. 3000-7000 pulls need `-s 0.05`).
+Recommended values for every CLI flag (with degradation curves per parameter) are in
+[docs/parameter_tuning.md](docs/parameter_tuning.md).
 A survey of related string art projects and algorithms — their parameters, darkness models,
 stopping rules and tricks — is in [docs/related_work.md](docs/related_work.md).
 
