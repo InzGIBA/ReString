@@ -30,3 +30,6 @@ output-color.png
 
 # ZCode session data
 .zcode/
+
+# maturin build artifact
+src/restring/_core.abi3.so
