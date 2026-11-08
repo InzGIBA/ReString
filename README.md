@@ -88,9 +88,10 @@ A survey of related string art projects and algorithms — their parameters, dar
 stopping rules and tricks — is in [docs/related_work.md](docs/related_work.md).
 
 # Photo credits
-The portrait photos used in the test suite (`tests/data/`) come from
-[Unsplash](https://unsplash.com/s/photos/people) and are used under the
-[Unsplash License](https://unsplash.com/license).
+The portrait fixtures used in the test suite (`tests/data/`) are square
+face-centered crops of studio portrait photos provided for this project.
+Earlier fixtures came from [Unsplash](https://unsplash.com/s/photos/people)
+under the [Unsplash License](https://unsplash.com/license).
 
 # License
 This project is licensed under the [MIT License](LICENSE).
