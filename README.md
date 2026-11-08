@@ -1,7 +1,7 @@
 # ReString
 Project for algorithmics course 2020. Also submitted to DeltaX 2021. Recreate art by connecting nails with strings.
 
-For a quick overview of the project, look at the project's [poster](https://raw.githubusercontent.com/kaspar98/StringArt/main/docs/Algoritmika%20poster%20puhtand.pdf).
+For a quick overview of the project, look at the project's [poster](https://raw.githubusercontent.com/InzGIBA/ReString/main/docs/Algoritmika%20poster%20puhtand.pdf).
 
 **Project goal**<br>
 Recreate images by looping a continuous string around nails. The nails are fixed on the border of a canvas (e.g. on a circle’s or rectangle’s perimeter).
@@ -82,10 +82,10 @@ uv run ruff check .    # lint
 The research notebooks in `notebooks/` import the package (`from restring.image_transformations import *`), so run `uv sync` first.
 
 # Examples
-![Ex1](https://raw.githubusercontent.com/kaspar98/StringArt/main/examples/Algoritmika%20fig%201.png)
+![Ex1](https://raw.githubusercontent.com/InzGIBA/ReString/main/examples/Algoritmika%20fig%201.png)
 --------
-![Ex2](https://raw.githubusercontent.com/kaspar98/StringArt/main/examples/Algoritmika%20projekt%20fig%202.png)
+![Ex2](https://raw.githubusercontent.com/InzGIBA/ReString/main/examples/Algoritmika%20projekt%20fig%202.png)
 --------
-![Ex3](https://raw.githubusercontent.com/kaspar98/StringArt/main/examples/Algoritmika%20fig%203.png)
+![Ex3](https://raw.githubusercontent.com/InzGIBA/ReString/main/examples/Algoritmika%20fig%203.png)
 --------
-![Ex4](https://raw.githubusercontent.com/kaspar98/StringArt/main/examples/Algoritmika%20fig%204.png)
+![Ex4](https://raw.githubusercontent.com/InzGIBA/ReString/main/examples/Algoritmika%20fig%204.png)
