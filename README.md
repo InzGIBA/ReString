@@ -23,28 +23,38 @@ The algorithm:<br>
 *² The number of iterations can be set manually or the algorithm can be set to repeat until it fails to find string pulls that improve the total result.<br>
 
 # Project structure
-Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/packaging-projects/) managed with [uv](https://docs.astral.sh/uv/):
+Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/packaging-projects/) managed with [uv](https://docs.astral.sh/uv/), with the greedy hot loop in a Rust extension (PyO3):
 
 ```
 ├── pyproject.toml       # PEP 621 metadata, dependencies, tool configs
+├── rust/                # Rust core (PyO3): greedy loop + line rasterizer
 ├── src/restring/        # the installable package
 │   ├── cli.py           # command line interface (entry point)
-│   ├── generator.py     # greedy algorithm and B/W + RGB pipelines
+│   ├── generator.py     # greedy algorithm (Rust core, numpy fallback)
 │   ├── nails.py         # nail position creation and scaling
-│   ├── canvas.py        # canvas init and thread drawing
-│   └── image_transformations.py  # rgb2gray, largest_square
-├── tests/               # pytest suite
+│   ├── canvas.py        # canvas init, AA line rasterizer, thread drawing
+│   ├── image_transformations.py  # rgb2gray, largest_square, resize
+│   └── metrics.py       # dependency-free SSIM
+├── tests/               # pytest suite (incl. Rust-vs-numpy equivalence)
 ├── notebooks/           # original research notebooks
 ├── examples/            # example outputs
-└── docs/                # project poster, quality analysis report
+└── docs/                # poster, quality/parameter/optimization reports
 ```
 
+Runtime dependencies are just **numpy + pillow** (Python 3.14+, numpy 2);
+matplotlib stays in the dev group for the analysis scripts.
+
 # Installation
-Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) (it manages the Python 3.11+ interpreter itself):
+Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) and a Rust
+toolchain to build the acceleration core (uv compiles it automatically):
 
 ```bash
 uv sync
 ```
+
+Without a Rust toolchain the package still works on the pure-numpy path
+(see [docs/optimization.md](docs/optimization.md) for benchmarks and a
+zig-based linker recipe for machines without a system C compiler).
 
 # Run from cmd
 ```bash
@@ -86,6 +96,8 @@ when a picture reaches its best quality, when it starts degrading, and how to pi
 a target number of thread pulls (e.g. 3000-7000 pulls need `-s 0.05`).
 Recommended values for every CLI flag (with degradation curves per parameter) are in
 [docs/parameter_tuning.md](docs/parameter_tuning.md).
+The optimization story — profiling, bit-compatible rasterizer ports, Python 3.14
+migration and the 82x Rust core — is in [docs/optimization.md](docs/optimization.md).
 A survey of related string art projects and algorithms — their parameters, darkness models,
 stopping rules and tricks — is in [docs/related_work.md](docs/related_work.md).
 

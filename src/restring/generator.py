@@ -13,6 +13,11 @@ from restring.canvas import (
 from restring.image_transformations import rgb2gray
 from restring.nails import scale_nails
 
+try:  # compiled Rust core (built automatically by uv/maturin when available)
+    from restring import _core
+except ImportError:  # pragma: no cover - numpy fallback path
+    _core = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -101,7 +106,31 @@ def _scan_from(cache, pic, orig_pic, strength, current_idx, subset_ids=None):
             float(seg_improvement[best]))
 
 
+def _random_subset_ids(nail_count, random_nails):
+    # the original implementation re-seeded default_rng(42) on every iteration,
+    # i.e. it always worked with the same subset — both backends share it
+    return np.random.default_rng(42).choice(range(nail_count), size=random_nails, replace=False)
+
+
+def _create_art_rust(nails, orig_pic, pic, strength, i_limit, random_nails):
+    subset = _random_subset_ids(len(nails), random_nails).tolist() if random_nails is not None else None
+    order, pic_out = _core.create_art(
+        [tuple(int(v) for v in nail) for nail in nails],
+        np.ascontiguousarray(orig_pic, dtype=float).ravel().tolist(),
+        (orig_pic.shape[0], orig_pic.shape[1]),
+        np.ascontiguousarray(pic, dtype=float).ravel().tolist(),
+        float(strength),
+        int(i_limit) if i_limit is not None else None,
+        subset,
+    )
+    pic[...] = np.asarray(pic_out, dtype=float).reshape(pic.shape)
+    return [int(idx) for idx in order]
+
+
 def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, line_cache=None):
+    if _core is not None:
+        return _create_art_rust(nails, orig_pic, pic, strength, i_limit, random_nails)
+
     start = process_time()
     iter_times = []
 
@@ -109,13 +138,9 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
     caches = line_cache if line_cache is not None else build_line_cache(nails)
     logger.info(f"Line cache built in {process_time() - cache_build:.2f}s")
 
-    # the original implementation re-seeded default_rng(42) on every iteration,
-    # i.e. it always worked with the same subset — reproduce that exactly
     subset_ids = None
     if random_nails is not None:
-        subset_ids = np.random.default_rng(42).choice(
-            range(len(nails)), size=random_nails, replace=False
-        )
+        subset_ids = _random_subset_ids(len(nails), random_nails)
 
     current_idx = 0
     pull_order = [0]

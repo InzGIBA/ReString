@@ -1,0 +1,16 @@
+[package]
+name = "restring-core"
+version = "0.1.0"
+edition = "2021"
+description = "Rust core for the ReString greedy string art algorithm"
+
+[lib]
+name = "restring_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["abi3-py312"] }
+
+[profile.release]
+opt-level = 3
+lto = true
