@@ -1,13 +1,11 @@
 import argparse
 import logging
 
-import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
 import numpy as np
-from skimage.transform import resize
+from PIL import Image
 
 from restring.generator import Config, generate_bw, generate_rgb
-from restring.image_transformations import largest_square
+from restring.image_transformations import largest_square, resize
 from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
 
 logger = logging.getLogger(__name__)
@@ -49,10 +47,7 @@ def main(argv=None):
         wb=args.wb,
     )
 
-    img = mpimg.imread(args.input_file)
-
-    if np.any(img > 100):
-        img = img / 255
+    img = np.asarray(Image.open(args.input_file).convert("RGB"), dtype=float) / 255
 
     if args.radius1_multiplier == 1 and args.radius2_multiplier == 1:
         img = largest_square(img)
@@ -76,7 +71,11 @@ def main(argv=None):
         #     f"Thread pull order by nail index:\n{'-'.join([str(idx) for idx in pull_order])}"
         # )
 
-    mpimg.imsave(args.output_file, result, cmap=plt.get_cmap("gray"), vmin=0.0, vmax=1.0)
+    if result.ndim == 2:
+        image = Image.fromarray((np.clip(result, 0, 1) * 255).astype(np.uint8), mode="L")
+    else:
+        image = Image.fromarray((np.clip(result, 0, 1) * 255).astype(np.uint8), mode="RGB")
+    image.save(args.output_file)
 
 
 if __name__ == '__main__':

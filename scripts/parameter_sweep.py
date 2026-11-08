@@ -21,16 +21,15 @@ import time
 from pathlib import Path
 
 import matplotlib
-import matplotlib.image as mpimg
 import numpy as np
+from PIL import Image
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from skimage.transform import resize  # noqa: E402
 
 from restring.canvas import init_canvas, pull_order_to_array_bw  # noqa: E402
 from restring.generator import create_art  # noqa: E402
-from restring.image_transformations import largest_square, rgb2gray  # noqa: E402
+from restring.image_transformations import largest_square, resize, rgb2gray  # noqa: E402
 from restring.nails import (  # noqa: E402
     create_circle_nail_positions,
     create_rectangle_nail_positions,
@@ -55,9 +54,7 @@ def mse(a, b):
 
 
 def load_photo(path):
-    img = mpimg.imread(path)
-    if np.any(img > 100):
-        img = img / 255
+    img = np.asarray(Image.open(path).convert("RGB"), dtype=float) / 255
     img = resize(largest_square(img), (SIDE, SIDE))
     return rgb2gray(img) * 0.9  # canonical reference = generator's internal target
 

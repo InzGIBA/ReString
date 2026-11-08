@@ -22,13 +22,11 @@ import logging
 from pathlib import Path
 
 import matplotlib
-import matplotlib.image as mpimg
 import numpy as np
+from PIL import Image
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from skimage.metrics import structural_similarity  # noqa: E402
-from skimage.transform import resize  # noqa: E402
 
 from restring.canvas import (  # noqa: E402
     get_aa_line,
@@ -37,7 +35,12 @@ from restring.canvas import (  # noqa: E402
     pull_order_to_array_rgb,
 )
 from restring.generator import create_art  # noqa: E402
-from restring.image_transformations import largest_square, rgb2gray  # noqa: E402
+from restring.image_transformations import (  # noqa: E402
+    largest_square,
+    resize,  # noqa: E402
+    rgb2gray,
+)
+from restring.metrics import ssim  # noqa: E402
 from restring.nails import create_circle_nail_positions  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -61,10 +64,8 @@ def corr(a, b):
 
 
 def load_working_image(path):
-    """Mirror restring.cli preprocessing: normalize, square-crop, resize to 300."""
-    img = mpimg.imread(path)
-    if np.any(img > 100):
-        img = img / 255
+    """Mirror restring.cli preprocessing: RGB load, square-crop, resize to 300."""
+    img = np.asarray(Image.open(path).convert("RGB"), dtype=float) / 255
     return resize(largest_square(img), (LONG_SIDE, LONG_SIDE))
 
 
@@ -121,7 +122,7 @@ def run_bw(photo, tag):
             rows.append({
                 "n": n,
                 "mse": mse(render, target),
-                "ssim": float(structural_similarity(target, render, data_range=1.0)),
+                "ssim": ssim(target, render),
                 "corr": corr(render, target),
                 "mean": float(render.mean()),
             })

@@ -10,15 +10,14 @@ The greedy pipeline is deterministic, so the numbers are stable across runs.
 
 from pathlib import Path
 
-import matplotlib.image as mpimg
 import numpy as np
 import pytest
-from skimage.transform import resize
 
+from _helpers import load_gray, load_rgb
 from restring.canvas import init_canvas, pull_order_to_array_bw
 from restring.cli import main
 from restring.generator import Config, generate_bw
-from restring.image_transformations import largest_square, rgb2gray
+from restring.image_transformations import largest_square, resize, rgb2gray
 from restring.nails import create_circle_nail_positions
 
 DATA = Path(__file__).parent / "data"
@@ -28,11 +27,8 @@ NAILS = create_circle_nail_positions(SHAPE, nail_step=4)
 
 
 def load_reference(path):
-    """Mirror the CLI preprocessing: normalize, square-crop, downscale to 64x64."""
-    img = mpimg.imread(path)
-    if np.any(img > 100):  # uint8 JPEG -> 0..1, same check as restring.cli
-        img = img / 255
-    return resize(largest_square(img), SHAPE)
+    """Mirror the CLI preprocessing: RGB load, square-crop, downscale to 64x64."""
+    return resize(largest_square(load_rgb(path)), SHAPE)
 
 
 def mse(a, b):
@@ -55,7 +51,7 @@ def test_cli_bw_portrait_quality(photo, tmp_path):
 
     main(["-i", str(photo), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "300"])
 
-    result = rgb2gray(mpimg.imread(output_file)[..., :3])
+    result = load_gray(output_file)
     blank_mse = mse(np.ones(SHAPE), reference)
     assert mse(result, reference) <= 0.65 * blank_mse  # measured: 0.39-0.52
     assert corr(result, reference) >= 0.45  # measured: 0.58-0.68
@@ -68,7 +64,7 @@ def test_cli_rgb_portrait_quality(tmp_path):
 
     main(["-i", str(photo), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "150", "--rgb"])
 
-    result = mpimg.imread(output_file)[..., :3]
+    result = load_rgb(output_file)
     for channel in range(3):
         blank_mse = mse(np.ones(SHAPE), reference[:, :, channel])
         # measured factors: 0.38-0.43
@@ -99,6 +95,6 @@ def test_cli_output_deterministic(tmp_path):
     for run in range(2):
         output_file = tmp_path / f"output_{run}.png"
         main(["-i", str(photo), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "100"])
-        outputs.append(mpimg.imread(output_file))
+        outputs.append(load_gray(output_file))
 
     assert np.array_equal(outputs[0], outputs[1])

@@ -1,4 +1,4 @@
-"""End-to-end quality acceptance tests.
+"""E2E quality acceptance tests.
 
 These tests assert that the greedy string art algorithm actually recreates the
 reference image, not merely that it runs. Quality is measured on deterministic
@@ -7,14 +7,14 @@ across runs). Every threshold was calibrated against the real pipeline — the
 measured value is noted next to each threshold, with a ~25-35% safety margin.
 """
 
-import matplotlib.image as mpimg
 import numpy as np
-from skimage.metrics import structural_similarity
 
+from _helpers import load_gray, load_rgb, save_image
 from restring.canvas import init_canvas, pull_order_to_array_bw
 from restring.cli import main
 from restring.generator import Config, generate_bw, generate_rgb
 from restring.image_transformations import rgb2gray
+from restring.metrics import ssim
 from restring.nails import create_circle_nail_positions
 
 SHAPE = (64, 64)
@@ -89,7 +89,7 @@ def test_bw_ssim_above_threshold():
     # simulation strength (0.05), so over-pulling overshoots the target
     result, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=30))
 
-    assert structural_similarity(target, result, data_range=1.0) >= 0.30  # measured: 0.40
+    assert ssim(target, result) >= 0.30  # recalibrated for restring.metrics.ssim
 
 
 def test_bw_more_pulls_not_worse():
@@ -112,7 +112,6 @@ def test_bw_structure_preserved():
 
     # both regions must render darker than untouched background — the picture is
     # spatially recognizable, not uniformly darkened
-    # measured: blob means 0.39 / 0.57, background 1.00
     assert result[blob_1].mean() < result[corner_background].mean() - 0.25
     assert result[blob_2].mean() < result[corner_background].mean() - 0.25
 
@@ -143,15 +142,14 @@ def test_cli_bw_quality(tmp_path):
     img = synthetic_disk()
     input_file = tmp_path / "input.png"
     output_file = tmp_path / "output.png"
-    mpimg.imsave(input_file, img)
+    save_image(input_file, img)
 
     main(["-i", str(input_file), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "150"])
 
-    raw = mpimg.imread(output_file)
-    assert raw.shape == (64, 64, 4)  # RGBA PNG
-    assert 0.0 <= raw.min() and raw.max() <= 1.0
+    result = load_gray(output_file)
+    assert result.shape == (64, 64)
+    assert 0.0 <= result.min() and result.max() <= 1.0
 
-    result = rgb2gray(raw[..., :3])
     target = rgb2gray(img) * 0.9
     blank_mse = mse(np.ones(SHAPE), target)
     assert mse(result, target) <= 0.45 * blank_mse  # measured: 0.029 (0.36x blank)
@@ -164,13 +162,12 @@ def test_cli_rgb_quality(tmp_path):
     img = synthetic_color()
     input_file = tmp_path / "input.png"
     output_file = tmp_path / "output.png"
-    mpimg.imsave(input_file, img)
+    save_image(input_file, img)
 
     main(["-i", str(input_file), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "100", "--rgb"])
 
-    raw = mpimg.imread(output_file)
-    assert raw.shape == (64, 64, 4)
-    result = raw[..., :3]
+    result = load_rgb(output_file)
+    assert result.shape == (64, 64, 3)
 
     for channel in range(3):
         blank_mse = mse(np.ones(SHAPE), img[:, :, channel])

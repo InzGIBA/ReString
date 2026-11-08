@@ -5,8 +5,8 @@ from time import process_time
 import numpy as np
 
 from restring.canvas import (
-    get_aa_line,
     init_canvas,
+    line_aa,
     pull_order_to_array_bw,
     pull_order_to_array_rgb,
 )
@@ -29,39 +29,95 @@ class Config:
     wb: bool = False
 
 
-def find_best_nail_position(current_position, nails, pic, orig_pic, strength, random_nails=None):
-    best_improvement = -99999
-    best_nail_position = None
-    best_nail_idx = None
+def build_line_cache(nails):
+    """Precompute anti-aliased line pixels for every ordered nail pair.
 
-    if random_nails is not None:
-        rng = np.random.default_rng(42)
-        nail_ids = rng.choice(range(len(nails)), size=random_nails, replace=False)
-        nails_and_ids = list(zip(nail_ids, nails[nail_ids]))
+    Returns one CSR-style record per source nail i:
+        (rr, cc, val, starts, targets)
+    where segment k covers the line i -> targets[k] over pixels
+    rr[starts[k]:starts[k+1]] (the last segment runs to the end). With this the
+    greedy candidate scan for one source nail is a handful of vectorized numpy
+    operations instead of a Python loop that re-rasterizes every candidate line
+    on every iteration.
+    """
+    n = len(nails)
+    caches = []
+    total_pixels = 0
+    for i in range(n):
+        p0 = nails[i]
+        rrs, ccs, vals, starts, targets = [], [], [], [0], []
+        for j in range(n):
+            if j == i:
+                continue
+            rr, cc, val = line_aa(p0[0], p0[1], nails[j][0], nails[j][1])
+            rrs.append(rr)
+            ccs.append(cc)
+            vals.append(val)
+            starts.append(starts[-1] + len(rr))
+            targets.append(j)
+        rr = np.concatenate(rrs).astype(np.int32)
+        cc = np.concatenate(ccs).astype(np.int32)
+        val = np.concatenate(vals).astype(np.float32)
+        total_pixels += len(rr)
+        caches.append((rr, cc, val, np.asarray(starts[:-1], dtype=np.int64), np.asarray(targets)))
+    logger.info(
+        f"Line cache: {n * (n - 1)} lines, {total_pixels / 1e6:.1f}M pixels "
+        f"(~{total_pixels * 12 / 1e6:.0f} MB)"
+    )
+    return caches
+
+
+def _scan_from(cache, pic, orig_pic, strength, current_idx, subset_ids=None):
+    """Vectorized replacement of the per-candidate find-best loop.
+
+    Returns (best_nail_idx, segment_slice, best_improvement) with the same
+    last-maximum tie-breaking as the original `>=` comparison loop. Segment
+    sums use cumsum differences, which stays correct for non-contiguous
+    random-nail subsets (unlike a plain reduceat over filtered starts).
+
+    Note: in random-nails mode the original could evaluate a degenerate
+    self-line (one darkened pixel); it can never win against real candidates,
+    so the self-line is simply excluded here.
+    """
+    rr, cc, val, starts, targets = cache
+    bounds = np.append(starts, len(rr))  # segment k spans bounds[k]:bounds[k+1]
+
+    if subset_ids is None:
+        seg_positions = np.arange(len(targets))
     else:
-        nails_and_ids = enumerate(nails)
+        seg_positions = np.searchsorted(targets, subset_ids[subset_ids != current_idx])
+    seg_starts = bounds[seg_positions]
+    seg_ends = bounds[seg_positions + 1]
 
-    for nail_idx, nail_position in nails_and_ids:
-        overlayed_line, rr, cc = get_aa_line(current_position, nail_position, strength, pic)
+    cur_px = pic[rr, cc]
+    new_px = np.clip(cur_px + strength * val, 0, 1)
+    improvement_px = (cur_px - orig_pic[rr, cc]) ** 2 - (new_px - orig_pic[rr, cc]) ** 2
+    cum = np.concatenate(([0.0], np.cumsum(improvement_px)))
+    seg_improvement = cum[seg_ends] - cum[seg_starts]
 
-        before_diff = np.abs(pic[rr, cc] - orig_pic[rr, cc])**2
-        after_diff = np.abs(overlayed_line - orig_pic[rr, cc])**2
-
-        improvement = np.sum(before_diff - after_diff)
-
-        if improvement >= best_improvement:
-            best_improvement = improvement
-            best_nail_position = nail_position
-            best_nail_idx = nail_idx
-
-    return best_nail_idx, best_nail_position, best_improvement
+    best = len(seg_improvement) - 1 - np.argmax(seg_improvement[::-1])  # last max
+    return (int(targets[seg_positions[best]]),
+            (int(seg_starts[best]), int(seg_ends[best])),
+            float(seg_improvement[best]))
 
 
-def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None):
+def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, line_cache=None):
     start = process_time()
     iter_times = []
 
-    current_position = nails[0]
+    cache_build = process_time()
+    caches = line_cache if line_cache is not None else build_line_cache(nails)
+    logger.info(f"Line cache built in {process_time() - cache_build:.2f}s")
+
+    # the original implementation re-seeded default_rng(42) on every iteration,
+    # i.e. it always worked with the same subset — reproduce that exactly
+    subset_ids = None
+    if random_nails is not None:
+        subset_ids = np.random.default_rng(42).choice(
+            range(len(nails)), size=random_nails, replace=False
+        )
+
+    current_idx = 0
     pull_order = [0]
 
     i = 0
@@ -82,24 +138,20 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None):
             if i > i_limit:
                 break
 
-        idx, best_position, best_improvement = find_best_nail_position(
-            current_position,
-            nails,
-            pic,
-            orig_pic,
-            strength,
-            random_nails,
+        rr, cc, val, _, _ = caches[current_idx]
+        best_idx, (seg_start, seg_end), best_improvement = _scan_from(
+            caches[current_idx], pic, orig_pic, strength, current_idx, subset_ids
         )
 
         if best_improvement <= 0:
             fails += 1
             continue
 
-        pull_order.append(idx)
-        best_line, rr, cc = get_aa_line(current_position, best_position, strength, pic)
-        pic[rr, cc] = best_line
+        pull_order.append(best_idx)
+        seg = slice(seg_start, seg_end)
+        pic[rr[seg], cc[seg]] = np.clip(pic[rr[seg], cc[seg]] + strength * val[seg], 0, 1)
 
-        current_position = best_position
+        current_idx = best_idx
         iter_times.append(process_time() - start_iter)
 
     logger.info(f"Time: {(process_time() - start):.2f}")
@@ -114,17 +166,20 @@ def generate_rgb(img, shape, nails, config: Config):
     g = img[:, :, 1]
     b = img[:, :, 2]
 
+    # one line cache shared by all three channels (the same nail grid)
+    shared_cache = build_line_cache(nails)
+
     pic_r = init_canvas(shape, black=config.wb)
     pull_orders_r = create_art(nails, r, pic_r, strength, i_limit=config.pull_amount,
-                               random_nails=config.random_nails)
+                               random_nails=config.random_nails, line_cache=shared_cache)
 
     pic_g = init_canvas(shape, black=config.wb)
     pull_orders_g = create_art(nails, g, pic_g, strength, i_limit=config.pull_amount,
-                               random_nails=config.random_nails)
+                               random_nails=config.random_nails, line_cache=shared_cache)
 
     pic_b = init_canvas(shape, black=config.wb)
     pull_orders_b = create_art(nails, b, pic_b, strength, i_limit=config.pull_amount,
-                               random_nails=config.random_nails)
+                               random_nails=config.random_nails, line_cache=shared_cache)
 
     max_pulls = np.max([len(pull_orders_r), len(pull_orders_g), len(pull_orders_b)])
     pull_orders_r = pull_orders_r + [pull_orders_r[-1]] * (max_pulls - len(pull_orders_r))
