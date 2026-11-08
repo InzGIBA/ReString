@@ -81,6 +81,14 @@ uv run ruff check .    # lint
 
 The research notebooks in `notebooks/` import the package (`from restring.image_transformations import *`), so run `uv sync` first.
 
+# Photo credits
+The portrait photos used in the test suite (`tests/data/`) come from
+[Unsplash](https://unsplash.com/s/photos/people) and are used under the
+[Unsplash License](https://unsplash.com/license).
+
+# License
+This project is licensed under the [MIT License](LICENSE).
+
 # Examples
 ![Ex1](https://raw.githubusercontent.com/InzGIBA/ReString/main/examples/Algoritmika%20fig%201.png)
 --------
