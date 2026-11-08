@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="372" height="216" viewBox="0 0 372 216" role="img" aria-labelledby="title desc">
+<title id="title">Verified output</title>
+<desc id="desc">Editable vector artwork. Change text and fill values or use config.json.</desc>
+<!-- PALETTE: bg #141619; fg #F4F1EA; accent #FF9459 -->
+<g font-family="Arial, Helvetica, sans-serif">
+<rect width="372" height="216" rx="16" fill="#141619"/>
+<text x="26" y="38" font-size="10" fill="#FF9459" font-weight="400" letter-spacing="2">03 / CAPABILITY</text><path d="M324 26h22v22M346 26l-24 24" fill="none" stroke="#FF9459" stroke-width="1.5"/><text x="24" y="94" font-size="25" fill="#F4F1EA" font-weight="700" >Verified output</text><text x="26" y="133" font-size="16" fill="#A7ACB4" font-weight="400" >Golden tests pin</text><text x="26" y="157" font-size="16" fill="#A7ACB4" font-weight="400" >pixels and pull order.</text><path d="M26 190H346" stroke="#34383E" stroke-width="1"/>
+</g></svg>
