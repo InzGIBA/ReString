@@ -23,11 +23,12 @@ from pathlib import Path
 
 import matplotlib
 import numpy as np
-from PIL import Image
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from _bridge import image_to_numpy  # noqa: E402
 
+from restring import _core  # noqa: E402
 from restring.canvas import (  # noqa: E402
     get_aa_line,
     init_canvas,
@@ -37,8 +38,7 @@ from restring.canvas import (  # noqa: E402
 from restring.generator import create_art  # noqa: E402
 from restring.image_transformations import (  # noqa: E402
     largest_square,
-    resize,  # noqa: E402
-    rgb2gray,
+    resize,
 )
 from restring.metrics import ssim  # noqa: E402
 from restring.nails import create_circle_nail_positions  # noqa: E402
@@ -65,8 +65,7 @@ def corr(a, b):
 
 def load_working_image(path):
     """Mirror restring.cli preprocessing: RGB load, square-crop, resize to 300."""
-    img = np.asarray(Image.open(path).convert("RGB"), dtype=float) / 255
-    return resize(largest_square(img), (LONG_SIDE, LONG_SIDE))
+    return resize(largest_square(_core.Image.load(path)), (LONG_SIDE, LONG_SIDE))
 
 
 def simulate_working(order, nails, target, strength, snapshot_set):
@@ -75,7 +74,7 @@ def simulate_working(order, nails, target, strength, snapshot_set):
     This replicates what create_art optimizes: the working simulation with its
     own (lower) thread strength.
     """
-    pic = init_canvas(target.shape)
+    pic = np.ones(target.shape)  # the working canvas this script replays
     current = nails[order[0]]
     snapshots = {}
     for i, idx in enumerate(order[1:], start=1):
@@ -100,13 +99,13 @@ def degradation_points(ns, values, k=1.05):
 
 
 def run_bw(photo, tag):
-    img = load_working_image(photo)
-    target = rgb2gray(img) * 0.9
+    target_img = load_working_image(photo).gray(0.9)
+    target = image_to_numpy(target_img)
     shape = target.shape
     nails = create_circle_nail_positions(shape, nail_step=4)
     logger.info(f"bw: {len(nails)} nails, greedy run up to {MAX_PULLS} pulls")
 
-    order = create_art(nails, target, init_canvas(shape), -0.05, i_limit=MAX_PULLS)
+    order, _ = create_art(nails, target_img, init_canvas(shape), -0.05, i_limit=MAX_PULLS)
     threads = len(order) - 1
     logger.info(f"bw: greedy produced {threads} improving pulls")
     snap_set = {n for n in SNAPSHOTS if n <= threads}
@@ -118,11 +117,13 @@ def run_bw(photo, tag):
     for s in EXPORT_STRENGTHS:
         rows = []
         for n in ns:
-            render = pull_order_to_array_bw(order[: n + 1], init_canvas(shape), nails, -s)
+            render_img = pull_order_to_array_bw(order[: n + 1], init_canvas(shape), nails, -s,
+                                                shape=shape)
+            render = image_to_numpy(render_img)
             rows.append({
                 "n": n,
                 "mse": mse(render, target),
-                "ssim": ssim(target, render),
+                "ssim": ssim(target_img, render_img),
                 "corr": corr(render, target),
                 "mean": float(render.mean()),
             })
@@ -178,8 +179,9 @@ def run_bw(photo, tag):
     montage_ns = [n for n in MONTAGE_NS if n <= threads]
     fig, axes = plt.subplots(1, len(montage_ns), figsize=(3 * len(montage_ns), 3.4))
     for ax, n in zip(axes, montage_ns):
-        render = pull_order_to_array_bw(order[: n + 1], init_canvas(shape), nails, -0.1)
-        ax.imshow(render, cmap="gray", vmin=0, vmax=1)
+        render_img = pull_order_to_array_bw(order[: n + 1], init_canvas(shape), nails, -0.1,
+                                            shape=shape)
+        ax.imshow(image_to_numpy(render_img), cmap="gray", vmin=0, vmax=1)
         ax.set_title(f"N = {n}")
         ax.axis("off")
     fig.suptitle("Ч/Б, сила нити 0.1: эволюция картины")
@@ -191,27 +193,30 @@ def run_bw(photo, tag):
 
 def run_rgb(photo, tag):
     img = load_working_image(photo)
+    img_np = image_to_numpy(img)
     shape = (LONG_SIDE, LONG_SIDE)
     nails = create_circle_nail_positions(shape, nail_step=4)
     logger.info(f"rgb: {len(nails)} nails, 3 greedy runs up to {MAX_PULLS} pulls")
 
     orders = []
     for channel in range(3):
-        order = create_art(nails, img[:, :, channel], init_canvas(shape), -0.1, i_limit=MAX_PULLS)
+        order, _ = create_art(nails, img.channel(channel), init_canvas(shape), -0.1,
+                              i_limit=MAX_PULLS)
         orders.append(order)
         logger.info(f"rgb: channel {channel} -> {len(order) - 1} pulls")
 
     ns = [n for n in SNAPSHOTS if n <= min(len(o) for o in orders) - 1]
-    colors = (np.array((1., 0., 0.)), np.array((0., 1., 0.)), np.array((0., 0., 1.)))
     rows = []
     for n in ns:
         # truncate each channel order to n+1 pulls, padding shorter ones with their last nail
         padded = [o[: n + 1] if len(o) >= n + 1 else o + [o[-1]] * (n + 1 - len(o)) for o in orders]
-        render = pull_order_to_array_rgb(padded, init_canvas(shape + (3,)), nails, colors, -0.1)
+        render_img = pull_order_to_array_rgb(padded, init_canvas(shape + (3,)), nails,
+                                             strength=-0.1, shape=shape)
+        render = image_to_numpy(render_img)
         rows.append({
             "n": n,
-            "mse": mse(render, img),
-            "ch_mse": [mse(render[:, :, c], img[:, :, c]) for c in range(3)],
+            "mse": mse(render, img_np),
+            "ch_mse": [mse(render[:, :, c], img_np[:, :, c]) for c in range(3)],
         })
         logger.info(f"rgb: snapshot {n} done")
 

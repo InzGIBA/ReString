@@ -10,10 +10,7 @@ authors = [
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
-dependencies = [
-    "numpy>=2.3",
-    "pillow>=11",
-]
+dependencies = []
 
 [project.scripts]
 restring = "restring.cli:main"
@@ -23,6 +20,7 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.14",
     "matplotlib>=3.8,<4",
+    "numpy>=2.3",
 ]
 
 [tool.pytest.ini_options]

@@ -2,16 +2,12 @@ import logging
 from dataclasses import dataclass
 from time import process_time
 
-import numpy as np
-
 from restring.canvas import (
     init_canvas,
     line_aa,
     pull_order_to_array_bw,
     pull_order_to_array_rgb,
 )
-from restring.image_transformations import rgb2gray
-from restring.nails import scale_nails
 
 try:  # compiled Rust core (built automatically by uv/maturin when available)
     from restring import _core
@@ -34,17 +30,52 @@ class Config:
     wb: bool = False
 
 
+def _random_subset_ids(nail_count, random_nails):
+    # the original implementation re-seeded default_rng(42) on every iteration,
+    # i.e. it always worked with the same subset — both backends share it
+    # (numpy lives in the dev dependency group)
+    import numpy as np
+
+    return np.random.default_rng(42).choice(range(nail_count), size=random_nails, replace=False)
+
+
+def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, line_cache=None):
+    """Greedy pull-order search on a grayscale target Image.
+
+    `pic` is only used for its initial fill (white/black canvas). Returns
+    (pull_order, final working canvas Image). Uses the Rust core; falls back
+    to the vectorized numpy implementation when the extension is unavailable.
+    """
+    subset = None
+    if random_nails is not None:
+        subset = [int(i) for i in _random_subset_ids(len(nails), random_nails)]
+
+    if _core is not None:
+        order, final = _core.create_art(
+            [(int(r), int(c)) for r, c in nails],
+            orig_pic,
+            float(strength),
+            int(i_limit) if i_limit is not None else None,
+            subset,
+            pic.pixel(0, 0, 0) >= 0.5,
+        )
+        return [int(i) for i in order], final
+
+    return _create_art_numpy(nails, orig_pic, pic, strength, i_limit, subset)
+
+
+# --- numpy fallback (dev dependency; reference implementation for tests) ----
+
 def build_line_cache(nails):
     """Precompute anti-aliased line pixels for every ordered nail pair.
 
     Returns one CSR-style record per source nail i:
         (rr, cc, val, starts, targets)
     where segment k covers the line i -> targets[k] over pixels
-    rr[starts[k]:starts[k+1]] (the last segment runs to the end). With this the
-    greedy candidate scan for one source nail is a handful of vectorized numpy
-    operations instead of a Python loop that re-rasterizes every candidate line
-    on every iteration.
+    rr[starts[k]:starts[k+1]] (the last segment runs to the end).
     """
+    import numpy as np
+
     n = len(nails)
     caches = []
     total_pixels = 0
@@ -60,9 +91,14 @@ def build_line_cache(nails):
             vals.append(val)
             starts.append(starts[-1] + len(rr))
             targets.append(j)
-        rr = np.concatenate(rrs).astype(np.int32)
-        cc = np.concatenate(ccs).astype(np.int32)
-        val = np.concatenate(vals).astype(np.float32)
+        if rrs:
+            rr = np.concatenate(rrs).astype(np.int32)
+            cc = np.concatenate(ccs).astype(np.int32)
+            val = np.concatenate(vals).astype(np.float32)
+        else:
+            rr = np.asarray([], dtype=np.int32)
+            cc = np.asarray([], dtype=np.int32)
+            val = np.asarray([], dtype=np.float32)
         total_pixels += len(rr)
         caches.append((rr, cc, val, np.asarray(starts[:-1], dtype=np.int64), np.asarray(targets)))
     logger.info(
@@ -73,24 +109,16 @@ def build_line_cache(nails):
 
 
 def _scan_from(cache, pic, orig_pic, strength, current_idx, subset_ids=None):
-    """Vectorized replacement of the per-candidate find-best loop.
+    """Vectorized candidate scan: cumsum segment sums, last-max tie-breaking."""
+    import numpy as np
 
-    Returns (best_nail_idx, segment_slice, best_improvement) with the same
-    last-maximum tie-breaking as the original `>=` comparison loop. Segment
-    sums use cumsum differences, which stays correct for non-contiguous
-    random-nail subsets (unlike a plain reduceat over filtered starts).
-
-    Note: in random-nails mode the original could evaluate a degenerate
-    self-line (one darkened pixel); it can never win against real candidates,
-    so the self-line is simply excluded here.
-    """
     rr, cc, val, starts, targets = cache
-    bounds = np.append(starts, len(rr))  # segment k spans bounds[k]:bounds[k+1]
+    bounds = np.append(starts, len(rr))
 
     if subset_ids is None:
         seg_positions = np.arange(len(targets))
     else:
-        seg_positions = np.searchsorted(targets, subset_ids[subset_ids != current_idx])
+        seg_positions = np.searchsorted(targets, np.asarray(subset_ids)[np.asarray(subset_ids) != current_idx])
     seg_starts = bounds[seg_positions]
     seg_ends = bounds[seg_positions + 1]
 
@@ -100,72 +128,45 @@ def _scan_from(cache, pic, orig_pic, strength, current_idx, subset_ids=None):
     cum = np.concatenate(([0.0], np.cumsum(improvement_px)))
     seg_improvement = cum[seg_ends] - cum[seg_starts]
 
-    best = len(seg_improvement) - 1 - np.argmax(seg_improvement[::-1])  # last max
+    best = len(seg_improvement) - 1 - np.argmax(seg_improvement[::-1])
     return (int(targets[seg_positions[best]]),
             (int(seg_starts[best]), int(seg_ends[best])),
             float(seg_improvement[best]))
 
 
-def _random_subset_ids(nail_count, random_nails):
-    # the original implementation re-seeded default_rng(42) on every iteration,
-    # i.e. it always worked with the same subset — both backends share it
-    return np.random.default_rng(42).choice(range(nail_count), size=random_nails, replace=False)
+def _create_art_numpy(nails, orig_pic, pic, strength, i_limit, subset_ids):
+    import numpy as np
 
+    from restring import _core as core_mod
 
-def _create_art_rust(nails, orig_pic, pic, strength, i_limit, random_nails):
-    subset = _random_subset_ids(len(nails), random_nails).tolist() if random_nails is not None else None
-    order, pic_out = _core.create_art(
-        [tuple(int(v) for v in nail) for nail in nails],
-        np.ascontiguousarray(orig_pic, dtype=float).ravel().tolist(),
-        (orig_pic.shape[0], orig_pic.shape[1]),
-        np.ascontiguousarray(pic, dtype=float).ravel().tolist(),
-        float(strength),
-        int(i_limit) if i_limit is not None else None,
-        subset,
-    )
-    pic[...] = np.asarray(pic_out, dtype=float).reshape(pic.shape)
-    return [int(idx) for idx in order]
-
-
-def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, line_cache=None):
-    if _core is not None:
-        return _create_art_rust(nails, orig_pic, pic, strength, i_limit, random_nails)
+    orig = np.asarray(orig_pic.tolist(), dtype=float)
+    white = pic.pixel(0, 0, 0) >= 0.5
+    work = np.full(orig.shape, 1.0 if white else 0.0)
+    subset = list(subset_ids) if subset_ids is not None else None
 
     start = process_time()
-    iter_times = []
-
-    cache_build = process_time()
-    caches = line_cache if line_cache is not None else build_line_cache(nails)
-    logger.info(f"Line cache built in {process_time() - cache_build:.2f}s")
-
-    subset_ids = None
-    if random_nails is not None:
-        subset_ids = _random_subset_ids(len(nails), random_nails)
+    caches = build_line_cache(nails)
+    logger.info(f"Line cache built in {process_time() - start:.2f}s")
 
     current_idx = 0
     pull_order = [0]
-
     i = 0
     fails = 0
 
     while True:
-        start_iter = process_time()
-
         i += 1
-
         if i % 500 == 0:
             logger.info(f"Iteration: {i}")
 
         if i_limit is None:
             if fails >= 3:
                 break
-        else:
-            if i > i_limit:
-                break
+        elif i > i_limit:
+            break
 
         rr, cc, val, _, _ = caches[current_idx]
         best_idx, (seg_start, seg_end), best_improvement = _scan_from(
-            caches[current_idx], pic, orig_pic, strength, current_idx, subset_ids
+            caches[current_idx], work, orig, strength, current_idx, subset
         )
 
         if best_improvement <= 0:
@@ -174,78 +175,60 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
 
         pull_order.append(best_idx)
         seg = slice(seg_start, seg_end)
-        pic[rr[seg], cc[seg]] = np.clip(pic[rr[seg], cc[seg]] + strength * val[seg], 0, 1)
-
+        work[rr[seg], cc[seg]] = np.clip(work[rr[seg], cc[seg]] + strength * val[seg], 0, 1)
         current_idx = best_idx
-        iter_times.append(process_time() - start_iter)
 
     logger.info(f"Time: {(process_time() - start):.2f}")
-    logger.info(f"Avg iteration time: {np.mean(iter_times):.6f}")
-    return pull_order
+    return pull_order, core_mod.Image.from_nested(work.tolist())
 
 
 def generate_rgb(img, shape, nails, config: Config):
     strength = 0.1 if config.wb else -0.1
 
-    r = img[:, :, 0]
-    g = img[:, :, 1]
-    b = img[:, :, 2]
+    # one greedy run per channel on a shared nail grid
+    orders = []
+    for channel in range(3):
+        order, _ = create_art(nails, img.channel(channel),
+                              init_canvas(shape, black=config.wb), strength,
+                              i_limit=config.pull_amount,
+                              random_nails=config.random_nails)
+        orders.append(order)
 
-    # one line cache shared by all three channels (the same nail grid)
-    shared_cache = build_line_cache(nails)
+    max_pulls = max(len(o) for o in orders)
+    orders = [o + [o[-1]] * (max_pulls - len(o)) for o in orders]
 
-    pic_r = init_canvas(shape, black=config.wb)
-    pull_orders_r = create_art(nails, r, pic_r, strength, i_limit=config.pull_amount,
-                               random_nails=config.random_nails, line_cache=shared_cache)
+    out_h = int(config.side_len * config.radius1_multiplier)
+    out_w = int(config.side_len * config.radius2_multiplier)
+    logger.info((out_h, out_w, 3))
 
-    pic_g = init_canvas(shape, black=config.wb)
-    pull_orders_g = create_art(nails, g, pic_g, strength, i_limit=config.pull_amount,
-                               random_nails=config.random_nails, line_cache=shared_cache)
-
-    pic_b = init_canvas(shape, black=config.wb)
-    pull_orders_b = create_art(nails, b, pic_b, strength, i_limit=config.pull_amount,
-                               random_nails=config.random_nails, line_cache=shared_cache)
-
-    max_pulls = np.max([len(pull_orders_r), len(pull_orders_g), len(pull_orders_b)])
-    pull_orders_r = pull_orders_r + [pull_orders_r[-1]] * (max_pulls - len(pull_orders_r))
-    pull_orders_g = pull_orders_g + [pull_orders_g[-1]] * (max_pulls - len(pull_orders_g))
-    pull_orders_b = pull_orders_b + [pull_orders_b[-1]] * (max_pulls - len(pull_orders_b))
-
-    pull_orders = [pull_orders_r, pull_orders_g, pull_orders_b]
-
-    color_image_dimens = int(config.side_len * config.radius1_multiplier), \
-        int(config.side_len * config.radius2_multiplier), 3
-    blank = init_canvas(color_image_dimens, black=config.wb)
-
-    logger.info(color_image_dimens)
-
-    scaled_nails = scale_nails(color_image_dimens[1] / shape[1], color_image_dimens[0] / shape[0], nails)
-
-    return pull_order_to_array_rgb(
-        pull_orders,
-        blank,
-        scaled_nails,
-        (np.array((1., 0., 0.,)), np.array((0., 1., 0.,)), np.array((0., 0., 1.,))),
-        config.export_strength if config.wb else -config.export_strength
-    ), pull_orders
+    export = config.export_strength if config.wb else -config.export_strength
+    result = pull_order_to_array_rgb(
+        orders,
+        init_canvas((out_h, out_w, 3), black=config.wb),
+        nails,
+        strength=export,
+        shape=shape,
+    )
+    return result, orders
 
 
 def generate_bw(img, shape, nails, config: Config):
     strength = 0.05 if config.wb else -0.05
 
-    orig_pic = rgb2gray(img) * 0.9
-    image_dimens = int(config.side_len * config.radius1_multiplier), int(config.side_len * config.radius2_multiplier)
+    target = img.gray(0.9)
+    pull_order, _ = create_art(
+        nails, target, init_canvas(shape, black=config.wb), strength,
+        i_limit=config.pull_amount, random_nails=config.random_nails,
+    )
 
-    pic = init_canvas(shape, black=config.wb)
-    pull_order = create_art(nails, orig_pic, pic, strength, i_limit=config.pull_amount,
-                            random_nails=config.random_nails)
-    blank = init_canvas(image_dimens, black=config.wb)
-
-    scaled_nails = scale_nails(image_dimens[1] / shape[1], image_dimens[0] / shape[0], nails)
-
-    return pull_order_to_array_bw(
+    out_h = int(config.side_len * config.radius1_multiplier)
+    out_w = int(config.side_len * config.radius2_multiplier)
+    export = config.export_strength if config.wb else -config.export_strength
+    result = pull_order_to_array_bw(
         pull_order,
-        blank,
-        scaled_nails,
-        config.export_strength if config.wb else -config.export_strength
-    ), pull_order
+        init_canvas((out_h, out_w), black=config.wb),
+        nails,
+        export,
+        shape=shape,
+    )
+    return result, pull_order

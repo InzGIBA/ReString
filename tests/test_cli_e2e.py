@@ -1,6 +1,7 @@
 import numpy as np
 
 import restring
+from _helpers import image_from_numpy, image_to_numpy
 from restring.cli import build_parser
 from restring.generator import Config, generate_bw
 from restring.nails import create_circle_nail_positions
@@ -48,14 +49,15 @@ def test_parser_accepts_all_flags():
 
 def test_generate_bw_smoke():
     rng = np.random.default_rng(1)
-    img = rng.random((32, 32, 3))
+    img = image_from_numpy(rng.random((32, 32, 3)))
     shape = (32, 32)
     nails = create_circle_nail_positions(shape, nail_step=4)
     config = Config(side_len=64, pull_amount=30, export_strength=0.1)
 
     result, pull_order = generate_bw(img, shape, nails, config)
 
-    assert result.shape == (64, 64)
-    assert result.min() >= 0.0
-    assert result.max() <= 1.0
+    arr = image_to_numpy(result)
+    assert result.shape() == (64, 64, 1)
+    assert arr.min() >= 0.0
+    assert arr.max() <= 1.0
     assert len(pull_order) >= 2

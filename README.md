@@ -41,8 +41,10 @@ Standard Python [src-layout](https://packaging.python.org/en/latest/tutorials/pa
 └── docs/                # poster, quality/parameter/optimization reports
 ```
 
-Runtime dependencies are just **numpy + pillow** (Python 3.14+, numpy 2);
-matplotlib stays in the dev group for the analysis scripts.
+Runtime dependencies: **none** — the whole pipeline (image codecs, nail layouts,
+rasterizer, greedy search, renders, metrics) lives in the Rust core; the Python
+package is a thin API over it. numpy and matplotlib stay in the dev group for
+tests and analysis scripts only.
 
 # Installation
 Requires [uv](https://docs.astral.sh/uv/getting-started/installation/) and a Rust
@@ -52,9 +54,14 @@ toolchain to build the acceleration core (uv compiles it automatically):
 uv sync
 ```
 
-Without a Rust toolchain the package still works on the pure-numpy path
-(see [docs/optimization.md](docs/optimization.md) for benchmarks and a
-zig-based linker recipe for machines without a system C compiler).
+Without a Rust toolchain the greedy search falls back to a vectorized numpy
+implementation (dev dependency). See [docs/optimization.md](docs/optimization.md)
+for benchmarks and a zig-based linker recipe for machines without a system
+C compiler.
+
+Note for library users: the public API operates on `restring._core.Image`
+objects (loaded/saved by the core itself); numpy bridging helpers live in
+`tests/_helpers.py` and `scripts/_bridge.py`.
 
 # Run from cmd
 ```bash

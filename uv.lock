@@ -397,27 +397,21 @@ wheels = [
 name = "restring"
 version = "0.1.0"
 source = { editable = "." }
-dependencies = [
-    { name = "numpy" },
-    { name = "pillow" },
-]
 
 [package.dev-dependencies]
 dev = [
     { name = "matplotlib" },
+    { name = "numpy" },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "numpy", specifier = ">=2.3" },
-    { name = "pillow", specifier = ">=11" },
-]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "matplotlib", specifier = ">=3.8,<4" },
+    { name = "numpy", specifier = ">=2.3" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "ruff", specifier = ">=0.14" },
 ]

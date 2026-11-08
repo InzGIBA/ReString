@@ -1,9 +1,7 @@
 import argparse
 import logging
 
-import numpy as np
-from PIL import Image
-
+from restring import _core
 from restring.generator import Config, generate_bw, generate_rgb
 from restring.image_transformations import largest_square, resize
 from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
@@ -47,13 +45,13 @@ def main(argv=None):
         wb=args.wb,
     )
 
-    img = np.asarray(Image.open(args.input_file).convert("RGB"), dtype=float) / 255
+    img = _core.Image.load(args.input_file)
 
     if args.radius1_multiplier == 1 and args.radius2_multiplier == 1:
-        img = largest_square(img)
-        img = resize(img, (LONG_SIDE, LONG_SIDE))
+        img = resize(largest_square(img), (LONG_SIDE, LONG_SIDE))
 
-    shape = (len(img), len(img[0]))
+    h, w, _ = img.shape()
+    shape = (h, w)
 
     if args.rect:
         nails = create_rectangle_nail_positions(shape, args.nail_step)
@@ -67,15 +65,8 @@ def main(argv=None):
         result, _ = generate_rgb(img, shape, nails, config)
     else:
         result, _ = generate_bw(img, shape, nails, config)
-        # logger.info(
-        #     f"Thread pull order by nail index:\n{'-'.join([str(idx) for idx in pull_order])}"
-        # )
 
-    if result.ndim == 2:
-        image = Image.fromarray((np.clip(result, 0, 1) * 255).astype(np.uint8), mode="L")
-    else:
-        image = Image.fromarray((np.clip(result, 0, 1) * 255).astype(np.uint8), mode="RGB")
-    image.save(args.output_file)
+    result.save_png(args.output_file)
 
 
 if __name__ == '__main__':

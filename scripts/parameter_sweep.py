@@ -22,18 +22,18 @@ from pathlib import Path
 
 import matplotlib
 import numpy as np
-from PIL import Image
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from _bridge import image_from_numpy, image_to_numpy  # noqa: E402
 
+from restring import _core  # noqa: E402
 from restring.canvas import init_canvas, pull_order_to_array_bw  # noqa: E402
 from restring.generator import create_art  # noqa: E402
-from restring.image_transformations import largest_square, resize, rgb2gray  # noqa: E402
+from restring.image_transformations import largest_square, resize  # noqa: E402
 from restring.nails import (  # noqa: E402
     create_circle_nail_positions,
     create_rectangle_nail_positions,
-    scale_nails,
 )
 
 logging.basicConfig(level=logging.WARNING)
@@ -54,16 +54,13 @@ def mse(a, b):
 
 
 def load_photo(path):
-    img = np.asarray(Image.open(path).convert("RGB"), dtype=float) / 255
-    img = resize(largest_square(img), (SIDE, SIDE))
-    return rgb2gray(img) * 0.9  # canonical reference = generator's internal target
+    """Canonical reference (the generator's internal target) as a core Image."""
+    img = resize(largest_square(_core.Image.load(path)), (SIDE, SIDE))
+    return img.gray(0.9)
 
 
-def render(order, nails, out_side, strength):
-    """Render a pull order at an arbitrary output resolution, as generate_bw does."""
-    canvas = init_canvas((out_side, out_side))
-    scaled = scale_nails(out_side / SIDE, out_side / SIDE, nails) if out_side != SIDE else nails
-    return pull_order_to_array_bw(order, canvas, scaled, -strength)
+def load_photo_np(path):
+    return image_to_numpy(load_photo(path))
 
 
 def savefig(fig, name):
@@ -79,20 +76,28 @@ def dump(name, data):
         json.dump(data, f, indent=1)
 
 
+def render_np(order, nails, out_side, strength):
+    """Render a pull order at an arbitrary output resolution (numpy output)."""
+    img = pull_order_to_array_bw(order, init_canvas((out_side, out_side)), nails,
+                                 -strength, shape=(SIDE, SIDE))
+    return image_to_numpy(img)
+
+
 def sweep_pulls():
     """-l / -s: one 7000-iteration greedy run per photo, render prefixes per strength."""
     results = {}
     for tag, path in PHOTOS.items():
+        ref_np = load_photo_np(path)
         ref = load_photo(path)
         nails = create_circle_nail_positions((SIDE, SIDE), nail_step=4)
         t0 = time.perf_counter()
-        order = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=7000)
+        order, _ = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=7000)
         elapsed = time.perf_counter() - t0
         ns = [n for n in PULL_SNAPSHOTS if n < len(order)]
         results[tag] = {"threads": len(order) - 1, "greedy_time_s": elapsed, "curves": {}}
         for s in STRENGTHS:
             results[tag]["curves"][str(s)] = [
-                {"n": n, "mse": mse(render(order[: n + 1], nails, SIDE, s), ref)} for n in ns
+                {"n": n, "mse": mse(render_np(order[: n + 1], nails, SIDE, s), ref_np)} for n in ns
             ]
         print(f"pulls {tag}: {len(order)-1} threads in {elapsed:.0f}s")
 
@@ -132,12 +137,13 @@ def sweep_nails():
     budget = 2000
     results = {}
     for tag, path in PHOTOS.items():
+        ref_np = load_photo_np(path)
         ref = load_photo(path)
         rows = []
         for step in steps:
             nails = create_circle_nail_positions((SIDE, SIDE), nail_step=step)
             t0 = time.perf_counter()
-            order = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=budget)
+            order, _ = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=budget)
             dt = time.perf_counter() - t0
             # equal-threads comparison at the minimum thread count across steps
             rows.append({
@@ -145,7 +151,7 @@ def sweep_nails():
                 "nails": len(nails),
                 "threads": len(order) - 1,
                 "time_s": dt,
-                "mse": mse(render(order, nails, SIDE, 0.05), ref),
+                "mse": mse(render_np(order, nails, SIDE, 0.05), ref_np),
             })
             print(f"nails {tag} step={step}: {len(nails)} nails, {len(order)-1} threads, {dt:.0f}s")
         results[tag] = rows
@@ -172,17 +178,18 @@ def sweep_random():
     budget = 2000
     results = {}
     for tag, path in PHOTOS.items():
+        ref_np = load_photo_np(path)
         ref = load_photo(path)
         nails = create_circle_nail_positions((SIDE, SIDE), nail_step=4)
         rows = []
         for k in subsets:
             t0 = time.perf_counter()
-            order = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05,
-                               i_limit=budget, random_nails=k)
+            order, _ = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05,
+                                  i_limit=budget, random_nails=k)
             dt = time.perf_counter() - t0
             rows.append({
                 "subset": k, "time_s": dt, "threads": len(order) - 1,
-                "mse": mse(render(order, nails, SIDE, 0.05), ref),
+                "mse": mse(render_np(order, nails, SIDE, 0.05), ref_np),
             })
             print(f"random {tag} k={k}: {dt:.1f}s")
         results[tag] = rows
@@ -210,11 +217,11 @@ def sweep_dims():
     for tag, path in PHOTOS.items():
         ref = load_photo(path)
         nails = create_circle_nail_positions((SIDE, SIDE), nail_step=4)
-        order = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=3000)
+        order, _ = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=3000)
         rows = []
         for d in dims:
-            rendered = render(order, nails, d, 0.05)
-            ref_d = resize(ref, (d, d))
+            rendered = render_np(order, nails, d, 0.05)
+            ref_d = image_to_numpy(ref.resize(d, d))
             rows.append({"d": d, "mse": mse(rendered, ref_d)})
         results[tag] = rows
         print(f"dims {tag}: done")
@@ -235,16 +242,17 @@ def sweep_layout():
     budget = 2000
     results = {}
     for tag, path in PHOTOS.items():
+        ref_np = load_photo_np(path)
         ref = load_photo(path)
         rows = []
         for layout in ("circle", "rect"):
             nails = (create_circle_nail_positions((SIDE, SIDE), nail_step=4) if layout == "circle"
                      else create_rectangle_nail_positions((SIDE, SIDE), nail_step=4))
             t0 = time.perf_counter()
-            order = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=budget)
+            order, _ = create_art(nails, ref, init_canvas((SIDE, SIDE)), -0.05, i_limit=budget)
             dt = time.perf_counter() - t0
             rows.append({"layout": layout, "nails": len(nails), "time_s": dt,
-                         "mse": mse(render(order, nails, SIDE, 0.05), ref)})
+                         "mse": mse(render_np(order, nails, SIDE, 0.05), ref_np)})
             print(f"layout {tag} {layout}: {len(nails)} nails {dt:.0f}s")
         results[tag] = rows
 
@@ -271,13 +279,13 @@ def sweep_darken():
     budget = 2000
     results = {}
     for tag, path in PHOTOS.items():
-        ref = load_photo(path)
+        ref_np = load_photo_np(path)
         nails = create_circle_nail_positions((SIDE, SIDE), nail_step=4)
         rows = []
         for c in factors:
-            target = ref * (c / 0.9)
-            order = create_art(nails, target, init_canvas((SIDE, SIDE)), -0.05, i_limit=budget)
-            rows.append({"c": c, "mse": mse(render(order, nails, SIDE, 0.05), ref)})
+            target = image_from_numpy(ref_np * (c / 0.9))
+            order, _ = create_art(nails, target, init_canvas((SIDE, SIDE)), -0.05, i_limit=budget)
+            rows.append({"c": c, "mse": mse(render_np(order, nails, SIDE, 0.05), ref_np)})
             print(f"darken {tag} c={c}: mse={rows[-1]['mse']:.4f}")
         results[tag] = rows
 

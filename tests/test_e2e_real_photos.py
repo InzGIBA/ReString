@@ -8,12 +8,14 @@ fixtures in test_e2e_quality.py, so thresholds here are calibrated separately
 The greedy pipeline is deterministic, so the numbers are stable across runs.
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from _helpers import load_gray, load_rgb
+from _helpers import image_to_numpy, load_gray, load_rgb
+from restring import _core
 from restring.canvas import init_canvas, pull_order_to_array_bw
 from restring.cli import main
 from restring.generator import Config, generate_bw
@@ -26,9 +28,9 @@ SHAPE = (64, 64)
 NAILS = create_circle_nail_positions(SHAPE, nail_step=4)
 
 
-def load_reference(path):
+def reference_image(path):
     """Mirror the CLI preprocessing: RGB load, square-crop, downscale to 64x64."""
-    return resize(largest_square(load_rgb(path)), SHAPE)
+    return resize(largest_square(_core.Image.load(os.fspath(path))), SHAPE)
 
 
 def mse(a, b):
@@ -46,7 +48,7 @@ def test_portrait_fixtures_present():
 
 @pytest.mark.parametrize("photo", PHOTOS, ids=lambda p: p.name)
 def test_cli_bw_portrait_quality(photo, tmp_path):
-    reference = rgb2gray(load_reference(photo))
+    reference = image_to_numpy(rgb2gray(reference_image(photo)))
     output_file = tmp_path / "output.png"
 
     main(["-i", str(photo), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "300"])
@@ -59,7 +61,7 @@ def test_cli_bw_portrait_quality(photo, tmp_path):
 
 def test_cli_rgb_portrait_quality(tmp_path):
     photo = DATA / "portrait_female.png"
-    reference = load_reference(photo)
+    reference = image_to_numpy(reference_image(photo))
     output_file = tmp_path / "output.png"
 
     main(["-i", str(photo), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "150", "--rgb"])
@@ -74,10 +76,11 @@ def test_cli_rgb_portrait_quality(tmp_path):
 
 def test_greedy_beats_random_on_portrait():
     photo = DATA / "portrait_male.png"
-    reference = rgb2gray(load_reference(photo))
+    ref_img = reference_image(photo)
+    reference = image_to_numpy(rgb2gray(ref_img))
 
-    result, order = generate_bw(load_reference(photo), SHAPE, NAILS, Config(side_len=64, pull_amount=150))
-    greedy_mse = mse(result, reference)
+    result, order = generate_bw(ref_img, SHAPE, NAILS, Config(side_len=64, pull_amount=150))
+    greedy_mse = mse(image_to_numpy(result), reference)
 
     for seed in (0, 1, 2):
         rng = np.random.default_rng(seed)
@@ -85,7 +88,7 @@ def test_greedy_beats_random_on_portrait():
         random_result = pull_order_to_array_bw(random_order, init_canvas(SHAPE), NAILS, -0.1)
         # measured greedy/random ratio: 0.61-0.63 — face crops have more usable
         # structure, guided pulling wins clearly
-        assert greedy_mse <= 0.8 * mse(random_result, reference), \
+        assert greedy_mse <= 0.8 * mse(image_to_numpy(random_result), reference), \
             f"greedy failed to beat random threads on a real portrait (seed={seed})"
 
 
