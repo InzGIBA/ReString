@@ -1,4 +1,5 @@
 import logging
+import warnings
 from dataclasses import dataclass
 
 from restring import _core, palettes
@@ -149,11 +150,17 @@ def generate_palette(img, shape, nails, config: Config, threads):
     return result, orders
 
 
+def _run_palette(img, shape, nails, config: Config, threads):
+    return generate_palette(img, shape, nails, config, threads)
+
+
 def generate_rgb(img, shape, nails, config: Config):
-    return generate_palette(img, shape, nails, config, palettes.builtin_palette("rgb"))
+    warnings.warn("restring.generate_rgb is deprecated since 2.0; use restring.generate()",
+                  DeprecationWarning, stacklevel=2)
+    return _run_palette(img, shape, nails, config, palettes.builtin_palette("rgb"))
 
 
-def generate_bw(img, shape, nails, config: Config):
+def _run_bw(img, shape, nails, config: Config):
     strength = 0.05 if config.wb else -0.05
 
     target = img.gray(0.9)
@@ -187,3 +194,9 @@ def generate_bw(img, shape, nails, config: Config):
         thread_px=_thread_px(config, config.side_len),
     )
     return result, pull_order
+
+
+def generate_bw(img, shape, nails, config: Config):
+    warnings.warn("restring.generate_bw is deprecated since 2.0; use restring.generate()",
+                  DeprecationWarning, stacklevel=2)
+    return _run_bw(img, shape, nails, config)
