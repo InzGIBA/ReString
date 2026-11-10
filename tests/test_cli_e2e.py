@@ -147,6 +147,31 @@ def test_cli_poster_end_to_end(tmp_path):
     assert ET.fromstring(poster_file.read_text()).tag.endswith("svg")
 
 
+def test_cli_anim_end_to_end(tmp_path, caplog):
+    import logging
+
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
+    anim_file = tmp_path / "wind.gif"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "60",
+          "--project-out", str(project_file)])
+
+    with caplog.at_level(logging.INFO):
+        main(["--project", str(project_file), "-o", str(tmp_path / "out2.png"),
+              "--anim", str(anim_file), "--anim-frames", "12"])
+
+    raw = anim_file.read_bytes()
+    assert raw[:4] == b"GIF8"
+    assert len(raw) > 1000
+    assert any("Animation written" in r.message for r in caplog.records)
+
+    with pytest.raises(SystemExit):
+        main(["-i", str(input_file), "-o", str(tmp_path / "out3.png"), "--anim", str(anim_file)])
+
+
 def test_resolve_export_strength():
     # fitted k = 104.0, residual band x1.06 (scripts/fit_export_strength.py)
     assert resolve_export_strength(1000) == pytest.approx(0.104)  # sweep anchor: best 0.1

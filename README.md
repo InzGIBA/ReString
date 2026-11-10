@@ -103,6 +103,7 @@ restring -i portrait.png -o out.png --rect -n 2 -l 3000
 | `--min-chord <px>` | candidate filter: chords shorter than the distance in working-grid pixels are banned. Portrait measurement: the greedy never picks short chords, the filter only degrades MSE past 250 px. Intended for sparse custom layouts | off |
 | `--project-out <path>` | save the nail layout and pull order as a `.restring` project alongside the PNG | off |
 | `--project <path>` | re-render from a `.restring` project instead of an image: skips the search, applies the current `-s` and `-d` | off |
+| `--anim <path>` | with `--project`: animated GIF of the winding sequence. `--anim-frames` sets the frame count, 180 is about 6 s at 30 fps. A 2000-pull project at the default 600 px export lands near 45 MB; `-d 450` brings it to about 28 MB, `-d 380` under 25 MB | off |
 
 Nails sit evenly on the perimeter. The circle starts at 9 o'clock and runs clockwise. The rectangle starts at the top left corner. The pull order is continuous by construction, so you wind one uncut thread.
 

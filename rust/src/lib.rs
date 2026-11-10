@@ -1037,6 +1037,193 @@ fn scaled_nails(nails: &[(i64, i64)], x_ratio: f64, y_ratio: f64) -> Vec<(i64, i
         .collect()
 }
 
+/// Snapshot an animation of a B/W pull order. `frames == 0` is raw mode: one
+/// image after every pull. `frames == n > 0` is downsampled mode: n images,
+/// frame 0 the blank canvas, the last frame after the final pull, the rest at
+/// evenly spaced pull counts (each pull applied exactly once, none skipped).
+/// Accumulate semantics match render_bw, so the last frame is pixel-identical
+/// to the full render at the same strength.
+#[pyfunction(signature = (order, nails, strength, in_w, in_h, out_w, out_h, white, frames))]
+fn animate_bw(
+    order: Vec<u64>,
+    nails: Vec<(i64, i64)>,
+    strength: f64,
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+    frames: usize,
+) -> Vec<Image> {
+    let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
+    let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h];
+    let total = order.len().saturating_sub(1);
+    let mut out: Vec<Image> = Vec::new();
+
+    if frames == 0 {
+        for step in 0..total {
+            draw_bw_step(&nails, &order, &mut canvas, strength, step, out_w, out_h);
+            out.push(snapshot(&canvas, out_w, out_h, 1));
+        }
+        return out;
+    }
+    if frames == 1 {
+        out.push(snapshot(&canvas, out_w, out_h, 1));
+        return out;
+    }
+
+    let f = frames as u64;
+    out.push(snapshot(&canvas, out_w, out_h, 1));
+    let mut done = 0usize;
+    for i in 1..f {
+        let target = ((total as u64 * i as u64) / (f - 1)) as usize;
+        while done < target {
+            draw_bw_step(&nails, &order, &mut canvas, strength, done, out_w, out_h);
+            done += 1;
+        }
+        out.push(snapshot(&canvas, out_w, out_h, 1));
+    }
+    out
+}
+
+/// Snapshot an animation of interleaved RGB pull orders: each interleaved
+/// step paints one pull of every channel (the render_rgb contract), frames
+/// follow the same raw/downsampled split as animate_bw.
+#[pyfunction(signature = (orders, nails, strengths, in_w, in_h, out_w, out_h, white, frames))]
+fn animate_rgb(
+    orders: Vec<Vec<u64>>,
+    nails: Vec<(i64, i64)>,
+    strengths: Vec<f64>,
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+    frames: usize,
+) -> PyResult<Vec<Image>> {
+    if strengths.len() != orders.len() {
+        return Err(PyValueError::new_err(
+            "animate_rgb needs one strength per channel order",
+        ));
+    }
+    let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
+    let colors: [[f64; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h * 3];
+    let total = orders.first().map(|o| o.len().saturating_sub(1)).unwrap_or(0);
+    let mut out: Vec<Image> = Vec::new();
+
+    let draw_step = |canvas: &mut [f64], step: usize| {
+        for (color_idx, order) in orders.iter().enumerate() {
+            let (a, b) = (order[step] as usize, order[step + 1] as usize);
+            let (rr, cc, val) = zingl_line(nails[a].0, nails[a].1, nails[b].0, nails[b].1);
+            for k in 0..rr.len() {
+                let px = (rr[k] as usize * out_w + cc[k] as usize).min(out_w * out_h - 1);
+                for c in 0..3 {
+                    canvas[px * 3 + c] += colors[color_idx][c] * val[k] * strengths[color_idx];
+                }
+            }
+        }
+    };
+
+    if frames == 0 {
+        for step in 0..total {
+            draw_step(&mut canvas, step);
+            out.push(snapshot(&canvas, out_w, out_h, 3));
+        }
+        return Ok(out);
+    }
+    if frames == 1 {
+        out.push(snapshot(&canvas, out_w, out_h, 3));
+        return Ok(out);
+    }
+
+    let f = frames as u64;
+    out.push(snapshot(&canvas, out_w, out_h, 3));
+    let mut done = 0usize;
+    for i in 1..f {
+        let target = ((total as u64 * i as u64) / (f - 1)) as usize;
+        while done < target {
+            draw_step(&mut canvas, done);
+            done += 1;
+        }
+        out.push(snapshot(&canvas, out_w, out_h, 3));
+    }
+    Ok(out)
+}
+
+/// Clamp a running canvas into an Image snapshot.
+fn snapshot(canvas: &[f64], w: usize, h: usize, ch: usize) -> Image {
+    Image {
+        data: canvas.iter().map(|v| v.clamp(0.0, 1.0)).collect(),
+        w,
+        h,
+        ch,
+    }
+}
+
+fn draw_bw_step(
+    nails: &[(i64, i64)],
+    order: &[u64],
+    canvas: &mut [f64],
+    strength: f64,
+    step: usize,
+    out_w: usize,
+    out_h: usize,
+) {
+    let (a, b) = (order[step] as usize, order[step + 1] as usize);
+    let (rr, cc, val) = zingl_line(nails[a].0, nails[a].1, nails[b].0, nails[b].1);
+    for k in 0..rr.len() {
+        let idx = (rr[k] as usize * out_w + cc[k] as usize).min(out_w * out_h - 1);
+        canvas[idx] += val[k] * strength;
+    }
+}
+
+/// Encode frames as an animated GIF (image crate GIF encoder, infinite loop,
+/// full-canvas frames so disposal semantics do not matter). Returns the
+/// number of frames written.
+#[pyfunction]
+fn save_gif(path: String, images: Vec<PyRef<'_, Image>>, fps: u16) -> PyResult<usize> {
+    use image::codecs::gif::{GifEncoder, Repeat};
+
+    let file = std::fs::File::create(&path)?;
+    let mut encoder = GifEncoder::new(file);
+    encoder
+        .set_repeat(Repeat::Infinite)
+        .map_err(|e| PyValueError::new_err(format!("gif encoder setup failed: {e}")))?;
+    let delay_num = 1000u32 / fps.max(1) as u32;
+    let delay = image::Delay::from_numer_denom_ms(delay_num, 1);
+    for img in &images {
+        let mut rgba = Vec::with_capacity(img.w * img.h * 4);
+        match img.ch {
+            1 => {
+                for &v in &img.data {
+                    let x = (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+                    rgba.extend_from_slice(&[x, x, x, 255]);
+                }
+            }
+            3 => {
+                for px in img.data.chunks_exact(3) {
+                    for c in px {
+                        rgba.push((c.clamp(0.0, 1.0) * 255.0).round() as u8);
+                    }
+                    rgba.push(255);
+                }
+            }
+            _ => {
+                return Err(PyValueError::new_err(
+                    "save_gif supports 1-channel and 3-channel images",
+                ))
+            }
+        }
+        let buffer = image::RgbaImage::from_raw(img.w as u32, img.h as u32, rgba)
+            .ok_or_else(|| PyValueError::new_err("frame buffer size mismatch"))?;
+        encoder
+            .encode_frame(image::Frame::from_parts(buffer, 0, 0, delay))
+            .map_err(|e| PyValueError::new_err(format!("gif encode failed: {e}")))?;
+    }
+    Ok(images.len())
+}
+
 /// Render a B/W pull order at the given resolution (port of
 /// canvas.pull_order_to_array_bw; nail scaling included).
 #[pyfunction]
@@ -1579,6 +1766,9 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(local_search, m)?)?;
     m.add_function(wrap_pyfunction!(render_bw, m)?)?;
     m.add_function(wrap_pyfunction!(render_rgb, m)?)?;
+    m.add_function(wrap_pyfunction!(animate_bw, m)?)?;
+    m.add_function(wrap_pyfunction!(animate_rgb, m)?)?;
+    m.add_function(wrap_pyfunction!(save_gif, m)?)?;
     m.add_function(wrap_pyfunction!(mse, m)?)?;
     m.add_function(wrap_pyfunction!(corr, m)?)?;
     m.add_function(wrap_pyfunction!(ssim, m)?)?;

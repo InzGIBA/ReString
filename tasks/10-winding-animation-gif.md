@@ -6,7 +6,7 @@
 | Depends on | T-08 (`.restring` project format as input) |
 | Unlocks | shareable renders; winding tutorials; project marketing |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (505e1f6) |
 
 ## Why
 

@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 
 from restring import _core
+from restring.animation import animate_project
 from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_array_rgb
 from restring.generator import Config, generate_bw, generate_rgb, resolve_export_strength
 from restring.image_transformations import largest_square, resize
@@ -36,6 +37,8 @@ def build_parser():
     parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size", default=260)
     parser.add_argument('--number-every', action="store", type=int, dest="number_every", default=10)
     parser.add_argument('--poster-preview', action="store_true")
+    parser.add_argument('--anim', action="store", dest="anim", default=None)
+    parser.add_argument('--anim-frames', action="store", type=int, dest="anim_frames", default=180)
     parser.add_argument('--wb', action="store_true")
     parser.add_argument('--rgb', action="store_true")
     parser.add_argument('--rect', action="store_true")
@@ -103,10 +106,15 @@ def main(argv=None):
         render_project(proj, args)
         if args.poster:
             write_poster(proj, args)
+        if args.anim:
+            animate_project(proj, args.anim, export_strength=args.export_strength,
+                            size=args.side_len, frames=args.anim_frames)
         return
 
     if args.poster and not args.project_out:
         parser.error("--poster needs --project or --project-out")
+    if args.anim and not args.project:
+        parser.error("--anim needs --project")
 
     config = Config(
         side_len=args.side_len,
