@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | perceptually better portraits; groundwork for face masks |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (f53d04d) |
 
 ## Why
 

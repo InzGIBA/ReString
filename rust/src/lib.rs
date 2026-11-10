@@ -499,7 +499,10 @@ fn build_sources(nails: &[(i64, i64)], range: std::ops::Range<usize>, w: usize) 
 
 /// Greedy pull-order search on the given grayscale target. Returns the pull
 /// order and the final working canvas. With `random_nails = Some(k)` only a
-/// fixed seeded subset of k candidates is scanned each iteration.
+/// fixed seeded subset of k candidates is scanned each iteration. With
+/// `weights = Some(map)` each pixel's error contribution is multiplied by the
+/// map value (the scan_candidates_weighted scoring), so threads concentrate
+/// on high-weight regions. Without weights the arithmetic is unchanged.
 ///
 /// The line cache is rasterized in parallel (result-preserving: each line is
 /// deterministic, chunks are reassembled in source order).
@@ -508,7 +511,7 @@ fn build_sources(nails: &[(i64, i64)], range: std::ops::Range<usize>, w: usize) 
 /// docs/optimization.md (stage 7): with canvas-crossing chords the per-line
 /// invalidation fan-out rivals the full rescan cost, so the cache measured
 /// 0.4-0.6x of the plain scan throughput.
-#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true))]
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, weights=None))]
 fn create_art(
     nails: Vec<(i64, i64)>,
     orig: &Image,
@@ -516,10 +519,22 @@ fn create_art(
     i_limit: Option<u64>,
     random_nails: Option<u64>,
     white: bool,
+    weights: Option<&Image>,
 ) -> PyResult<(Vec<u64>, Image)> {
     if orig.ch != 1 {
         return Err(PyValueError::new_err("create_art needs a grayscale target"));
     }
+    let weight_map: Vec<f64> = match weights {
+        None => Vec::new(),
+        Some(w) => {
+            if w.ch != 1 || w.w != orig.w || w.h != orig.h {
+                return Err(PyValueError::new_err(
+                    "weights must be grayscale with the same shape as orig",
+                ));
+            }
+            w.data.clone()
+        }
+    };
     let (w, h) = (orig.w, orig.h);
     let n = nails.len();
 
@@ -588,12 +603,22 @@ fn create_art(
             };
             let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
             let mut improvement = 0.0f64;
-            for k in s0..s1 {
-                let px = sl.flat_idx[k] as usize;
-                let cur = pic[px];
-                let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
-                let o = orig.data[px];
-                improvement += (cur - o) * (cur - o) - (new - o) * (new - o);
+            if weight_map.is_empty() {
+                for k in s0..s1 {
+                    let px = sl.flat_idx[k] as usize;
+                    let cur = pic[px];
+                    let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
+                    let o = orig.data[px];
+                    improvement += (cur - o) * (cur - o) - (new - o) * (new - o);
+                }
+            } else {
+                for k in s0..s1 {
+                    let px = sl.flat_idx[k] as usize;
+                    let cur = pic[px];
+                    let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
+                    let o = orig.data[px];
+                    improvement += weight_map[px] * ((cur - o) * (cur - o) - (new - o) * (new - o));
+                }
             }
             if improvement >= best_improvement {
                 best_improvement = improvement;
@@ -1126,9 +1151,32 @@ fn scan_candidates_weighted(
     out
 }
 
+/// Gaussian center-focus weight map for importance-weighted search:
+/// w(r,c) = bg + (peak - bg) * exp(-d^2 / (2 sigma^2)), d = pixel distance
+/// from the image center (w/2, h/2). Matches the numpy builder in
+/// scripts/alternatives_experiment.py.
+#[pyfunction]
+fn gaussian_weights(w: usize, h: usize, sigma: f64, peak: f64, bg: f64) -> Image {
+    let (cy, cx) = (h as f64 / 2.0, w as f64 / 2.0);
+    let mut data = Vec::with_capacity(w * h);
+    for r in 0..h {
+        let dr = r as f64 - cy;
+        for c in 0..w {
+            let dc = c as f64 - cx;
+            let gauss = (-(dr * dr + dc * dc) / (2.0 * sigma * sigma)).exp();
+            data.push(bg + (peak - bg) * gauss);
+        }
+    }
+    Image { data, w, h, ch: 1 }
+}
+
 /// Importance-weighted greedy search. Same pipeline as create_art, but each
 /// pixel's error contribution is multiplied by a weight. Higher weights
 /// attract more threads to the region.
+///
+/// Superseded: create_art with weights=Some(map) carries the same scoring in
+/// the production path, with the parallel cache build and random_nails.
+/// Kept because scripts/alternatives_experiment.py calls this function.
 #[pyfunction(signature = (nails, orig, weights, strength, i_limit=None, white=true))]
 fn weighted_search(
     nails: Vec<(i64, i64)>,
@@ -1437,6 +1485,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(circle_nails, m)?)?;
     m.add_function(wrap_pyfunction!(rect_nails, m)?)?;
     m.add_function(wrap_pyfunction!(create_art, m)?)?;
+    m.add_function(wrap_pyfunction!(gaussian_weights, m)?)?;
     m.add_function(wrap_pyfunction!(beam_search, m)?)?;
     m.add_function(wrap_pyfunction!(horizon_search, m)?)?;
     m.add_function(wrap_pyfunction!(weighted_search, m)?)?;

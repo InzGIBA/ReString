@@ -12,6 +12,7 @@ Every CLI flag, measured on face-centered portrait fixtures (`tests/data/`). Eac
 | `-n` | 4 for the knee, 2 for maximum quality | 844 circle nails buy 6 percent error reduction at 4x the cost |
 | `-r` | 100 to 150 while exploring, drop the flag for the final run | k=100 saves 40 percent of the time for 15 percent error |
 | `-d` | 300 | exporting above the working grid hurts |
+| `--weight` | 3.0 for portraits, off for other subjects | center MSE falls 24 to 28 percent, global MSE rises 3 percent |
 
 ## Thread count and export strength
 
@@ -76,6 +77,12 @@ Every layout saturates in the same 2500 to 2900 thread band. Raising the iterati
 A published rule from Birsak et al. says darker inputs approximate better. Measured on this code base, the rule fails: c=0.9 gives MSE 0.054, c=0.7 adds 4 to 5 percent, c=0.5 adds 14 to 16 percent. The accumulate-and-clip model with explicit thread strength differs from their opaque clamp. Keep the built-in 0.9 factor.
 
 ![Input darkening](img/params/darken.png)
+
+## Importance weighting
+
+`--weight <peak>` multiplies each pixel's error contribution by a Gaussian weight map centered on the image: peak at the center, 0.5 at the borders, sigma one third of the side length. Threads concentrate on the center and the periphery loses ink.
+
+Measured on both portrait fixtures at 2000 threads (`--rect`, `-s 0.05`): center MSE inside the central 50 percent box falls 24 to 28 percent, global MSE rises about 3 percent, scan time grows about 25 percent. Use `--weight 3` for portraits. Leave the flag off for subjects without a single center of interest: landscapes, groups, text. Full tables: [research/alternatives-experiment.md](research/alternatives-experiment.md).
 
 ## Presets
 

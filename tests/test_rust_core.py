@@ -8,6 +8,8 @@ docs/optimization.md). Any change in rasterization, tie-breaking or subset
 seeding must consciously update these goldens.
 """
 
+import math
+
 import numpy as np
 import pytest
 
@@ -105,6 +107,64 @@ SUBSET_ORDER = [
     41, 23, 28, 18, 38, 12, 28, 38, 4, 39, 1, 10, 39, 28, 22, 15, 5, 38, 13,
     29, 36, 1, 23, 34, 16, 4, 18, 29, 4, 35, 22,
 ]
+
+
+# Frozen importance-weighted order: same fixture as the full-scan golden, Gaussian weight map
+# (sigma 64/3, peak 3, bg 0.5), 400 iters.
+WEIGHTED_ORDER = [
+    0, 21, 0, 24, 3, 27, 3, 24, 1, 22, 43, 19, 43, 20, 1, 26, 5, 28, 7, 30, 11, 33, 14, 37, 14,
+    38, 15, 34, 10, 32, 10, 28, 6, 26, 4, 23, 2, 27, 8, 26, 3, 24, 1, 19, 42, 23, 42, 18, 40,
+    16, 38, 14, 35, 11, 34, 7, 29, 9, 31, 12, 36, 17, 39, 17, 1, 27, 8, 35, 13, 32, 6, 29, 4,
+    30, 5, 25, 6, 34, 9, 33, 17, 36, 7, 26, 5, 31, 14, 35, 16, 40, 22, 2, 21, 5, 24, 42, 26,
+    40, 17, 41, 23, 2, 30, 13, 28, 8, 26, 3, 21, 42, 14, 39, 11, 37, 19, 40, 24, 39, 20, 37,
+    16, 43, 17, 34, 15, 32, 16, 40, 13, 41, 18, 37, 10, 28, 5, 22, 37, 15, 36, 7, 31, 6, 23,
+    36, 7, 21, 4, 33, 15, 39, 11, 29, 2, 27, 12, 38, 22, 6, 35, 19, 37, 24, 7, 30, 10, 25, 1,
+    17, 31, 3, 17, 33, 10, 38, 11, 40, 26, 9, 36, 12, 28, 13, 24, 43, 27, 12, 35, 5, 18, 2, 31,
+    15, 29, 0, 13, 31, 19, 43, 15, 41, 25, 42, 20, 36, 23, 8, 29, 3, 25, 40, 21, 7, 34, 21, 35,
+    17, 30, 4, 20, 0, 13, 24, 37, 6, 34, 2, 30, 9, 38, 15, 42, 11, 23, 37, 21, 10, 41, 14, 43,
+    22, 34, 13, 2, 17, 29, 7, 19, 8, 33, 18, 4, 32, 19, 1, 32, 13, 26, 40, 9, 23, 5, 35, 24, 9,
+    19, 39, 23, 4, 15, 28, 42, 26, 38, 24, 8, 40, 11, 36, 7, 33, 43, 30, 14, 27, 11, 22, 10,
+    41, 11, 23, 36, 5, 18, 1, 30, 0, 25, 6, 39, 27, 41, 29, 5, 16, 3, 37, 20, 10, 27, 6, 18,
+    30, 3, 27, 37, 22, 13, 1, 34, 21, 7, 17, 31, 22, 33, 43, 8, 19, 41, 12, 37, 6, 26, 0, 33,
+    16, 1, 26, 4, 39, 28, 19, 7, 23, 32, 0, 27, 17, 7, 26, 14, 24, 35, 2, 13, 24, 11, 43, 31,
+    19, 29, 4, 34, 25, 8, 38, 28, 7, 41, 30, 23, 9, 19, 33, 12, 3, 37, 26, 16, 37, 9, 0, 34, 3,
+    15, 35, 3, 13, 22, 13, 39, 6, 21, 30, 23, 12, 26, 39, 8, 43, 13,
+]
+
+
+def test_greedy_order_golden_weighted():
+    rng = np.random.default_rng(5)
+    target = image_from_numpy(rng.random(SHAPE) * 0.8 + 0.1)
+    weights = _core.gaussian_weights(64, 64, SHAPE[0] / 3, 3.0, 0.5)
+
+    order, _ = create_art(NAILS, target, init_canvas(SHAPE), -0.05, i_limit=400, weights=weights)
+
+    assert order == WEIGHTED_ORDER
+
+
+def test_weighted_search_supports_random_nails():
+    # the merged weighted path keeps subset scanning (weighted_search lacks it)
+    rng = np.random.default_rng(9)
+    target = image_from_numpy(rng.random(SHAPE) * 0.8 + 0.1)
+    weights = _core.gaussian_weights(64, 64, 16.0, 3.0, 0.5)
+
+    order_a, _ = create_art(NAILS, target, init_canvas(SHAPE), -0.05,
+                            i_limit=300, random_nails=20, weights=weights)
+    order_b, _ = create_art(NAILS, target, init_canvas(SHAPE), -0.05,
+                            i_limit=300, random_nails=20, weights=weights)
+
+    assert order_a == order_b
+    assert order_a != SUBSET_ORDER  # weighting changed the choices
+
+
+def test_gaussian_weights_values():
+    w = _core.gaussian_weights(64, 64, 16.0, 3.0, 0.5)
+    assert w.shape() == (64, 64, 1)
+    # center sits at (w/2, h/2) = (32, 32), value == peak
+    assert abs(w.pixel(32, 32, 0) - 3.0) < 1e-12
+    # corner: d^2 = 2048, w = bg + (peak - bg) * exp(-2048 / (2 * 16^2))
+    expected = 0.5 + 2.5 * math.exp(-4.0)
+    assert abs(w.pixel(0, 0, 0) - expected) < 1e-12
 
 
 def test_greedy_order_golden_full_scan():

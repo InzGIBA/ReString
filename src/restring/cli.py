@@ -22,6 +22,7 @@ def build_parser():
     parser.add_argument('-r1', action="store", type=float, dest="radius1_multiplier", default=1)
     parser.add_argument('-r2', action="store", type=float, dest="radius2_multiplier", default=1)
     parser.add_argument('-n', action="store", type=int, dest="nail_step", default=4)
+    parser.add_argument('--weight', action="store", type=float, dest="weight_peak", default=None)
     parser.add_argument('--wb', action="store_true")
     parser.add_argument('--rgb', action="store_true")
     parser.add_argument('--rect', action="store_true")
@@ -43,6 +44,7 @@ def main(argv=None):
         radius1_multiplier=args.radius1_multiplier,
         radius2_multiplier=args.radius2_multiplier,
         wb=args.wb,
+        weight_peak=args.weight_peak,
     )
 
     img = _core.Image.load(args.input_file)

@@ -20,7 +20,7 @@ from restring.canvas import init_canvas, pull_order_to_array_bw
 from restring.cli import main
 from restring.generator import Config, generate_bw
 from restring.image_transformations import largest_square, resize, rgb2gray
-from restring.nails import create_circle_nail_positions
+from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
 
 DATA = Path(__file__).parent / "data"
 PHOTOS = sorted(DATA.glob("portrait_*.png"))
@@ -101,3 +101,32 @@ def test_cli_output_deterministic(tmp_path):
         outputs.append(load_gray(output_file))
 
     assert np.array_equal(outputs[0], outputs[1])
+
+
+def center_mse(a, b):
+    """MSE inside the central 50% box, the face region (experiment metric)."""
+    box = (slice(a.shape[0] // 4, 3 * a.shape[0] // 4), slice(a.shape[1] // 4, 3 * a.shape[1] // 4))
+    return float(np.mean((a[box] - b[box]) ** 2))
+
+
+@pytest.mark.parametrize("photo", PHOTOS, ids=lambda p: p.name)
+def test_weight_flag_improves_center_quality(photo):
+    """--weight 3 must beat plain greedy inside the central 50% box at 2000
+    threads. Measured gains: male 23.7 percent, female 25.0 percent
+    (docs/research/alternatives-experiment.md). Threshold 15 percent."""
+    ref_img = resize(largest_square(_core.Image.load(os.fspath(photo))), (300, 300))
+    reference = image_to_numpy(ref_img.gray(0.9))
+    nails = create_rectangle_nail_positions((300, 300), nail_step=4)
+
+    plain, _ = generate_bw(ref_img, (300, 300), nails,
+                           Config(side_len=300, pull_amount=2000, export_strength=0.05))
+    weighted, _ = generate_bw(ref_img, (300, 300), nails,
+                              Config(side_len=300, pull_amount=2000, export_strength=0.05,
+                                     weight_peak=3.0))
+
+    plain_center = center_mse(image_to_numpy(plain), reference)
+    weighted_center = center_mse(image_to_numpy(weighted), reference)
+    # measured: 0.0257 -> 0.0196 (male), 0.0300 -> 0.0225 (female)
+    assert weighted_center <= 0.85 * plain_center, \
+        f"weighting failed to improve the center box on {photo.name}: " \
+        f"{weighted_center:.4f} vs plain {plain_center:.4f}"

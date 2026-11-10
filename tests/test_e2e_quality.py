@@ -178,3 +178,28 @@ def test_cli_rgb_quality(tmp_path):
         # measured factors: R 0.58, G 0.57, B 0.61
         assert mse(result[:, :, channel], reference[:, :, channel]) <= 0.75 * blank_mse, \
             f"channel {channel} failed quality acceptance"
+
+
+def test_cli_weight_flag_concentrates_threads(tmp_path):
+    """--weight must pull threads toward the image center. Fixture: one blob
+    at the center, one bar at the corner. Weighting serves the center blob
+    and starves the corner bar. Measured: disk 0.0545 -> 0.0216, bar
+    0.3639 -> 0.4660 (brighter = less ink)."""
+    img = synthetic_two_blobs()
+    input_file = tmp_path / "input.png"
+    save_image(input_file, image_to_numpy(img))
+
+    plain_file = tmp_path / "plain.png"
+    weighted_file = tmp_path / "weighted.png"
+    main(["-i", str(input_file), "-o", str(plain_file), "-d", "64", "-n", "4", "-l", "300"])
+    main(["-i", str(input_file), "-o", str(weighted_file), "-d", "64", "-n", "4", "-l", "300",
+          "--weight", "3"])
+
+    plain = load_gray(plain_file)
+    weighted = load_gray(weighted_file)
+
+    # central blob stays at least as dark, corner bar loses ink
+    blob = (R - 20) ** 2 + (C - 20) ** 2 < 9 ** 2
+    bar = (R > 44) & (C > 40) & (C < 60)
+    assert weighted[blob].mean() < plain[blob].mean()
+    assert weighted[bar].mean() > plain[bar].mean() + 0.05

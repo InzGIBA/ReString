@@ -100,6 +100,7 @@ uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000 -s 0.05
 | `--rect` | nails on the rectangle border instead of the circle. Better for square portraits, about 2x lower error | circle |
 | `--rgb` | colored output with three interleaved threads | black and white |
 | `--wb` | white thread on a black canvas | black on white |
+| `--weight <float>` | importance weighting. A Gaussian weight map steers threads toward the image center, where the viewer looks. Suggested range 1.5 to 5.0. Portrait subjects only, about 25 percent more scan time | off |
 
 Nails sit evenly on the perimeter. The circle starts at 9 o'clock and runs clockwise. The rectangle starts at the top left corner. The pull order is continuous by construction, so you wind one uncut thread.
 
@@ -132,6 +133,7 @@ The `-s` value matters more than any other flag. The working simulation darkens 
 | `-n` | 4 for the knee, 2 for maximum quality | 844 circle nails buy 6 percent error reduction at 4x the cost |
 | `-r` | 100 to 150 while exploring, drop for the final run | k=100 saves 40 percent of the time for 15 percent error |
 | `-d` | 300 | exporting above the working grid hurts |
+| `--weight` | 3.0 for portraits, off for other subjects | center MSE falls 24 to 28 percent, global MSE rises 3 percent |
 
 Every flag, the numbers behind the rules and the degradation curves: [docs/tuning.md](docs/tuning.md).
 

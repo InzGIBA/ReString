@@ -28,12 +28,14 @@ def test_parser_defaults():
     assert args.radius1_multiplier == 1
     assert args.radius2_multiplier == 1
     assert args.nail_step == 4
+    assert args.weight_peak is None
     assert not (args.wb or args.rgb or args.rect)
 
 
 def test_parser_accepts_all_flags():
     argv = ["-i", "a.png", "-o", "b.png", "-d", "50", "-s", "0.2", "-l", "10",
-            "-r", "7", "-r1", "1.2", "-r2", "0.8", "-n", "3", "--wb", "--rgb", "--rect"]
+            "-r", "7", "-r1", "1.2", "-r2", "0.8", "-n", "3", "--weight", "3",
+            "--wb", "--rgb", "--rect"]
 
     args = build_parser().parse_args(argv)
 
@@ -44,6 +46,7 @@ def test_parser_accepts_all_flags():
     assert args.random_nails == 7
     assert (args.radius1_multiplier, args.radius2_multiplier) == (1.2, 0.8)
     assert args.nail_step == 3
+    assert args.weight_peak == 3.0
     assert args.wb and args.rgb and args.rect
 
 
