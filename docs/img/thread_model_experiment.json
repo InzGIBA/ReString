@@ -1,0 +1,138 @@
+{
+ "male": [
+  {
+   "config": "hairline_500",
+   "width_mm": 0.0,
+   "pulls": 500,
+   "mse": 0.2422
+  },
+  {
+   "config": "hairline_1000",
+   "width_mm": 0.0,
+   "pulls": 1000,
+   "mse": 0.2181
+  },
+  {
+   "config": "thick_0.15mm_500",
+   "width_mm": 0.15,
+   "pulls": 500,
+   "thread_px": 0.45,
+   "mse": 0.2306
+  },
+  {
+   "config": "thick_0.2mm_500",
+   "width_mm": 0.2,
+   "pulls": 500,
+   "thread_px": 0.6,
+   "mse": 0.2268
+  },
+  {
+   "config": "thick_0.3mm_500",
+   "width_mm": 0.3,
+   "pulls": 500,
+   "thread_px": 0.9,
+   "mse": 0.2194
+  },
+  {
+   "config": "hairline_2000",
+   "width_mm": 0.0,
+   "pulls": 2000,
+   "mse": 0.1781
+  },
+  {
+   "config": "hairline_2000",
+   "width_mm": 0.0,
+   "pulls": 2000,
+   "mse": 0.1781
+  },
+  {
+   "config": "thick_0.15mm_2000",
+   "width_mm": 0.15,
+   "pulls": 2000,
+   "thread_px": 0.45,
+   "mse": 0.1443
+  },
+  {
+   "config": "thick_0.2mm_2000",
+   "width_mm": 0.2,
+   "pulls": 2000,
+   "thread_px": 0.6,
+   "mse": 0.1341
+  },
+  {
+   "config": "thick_0.3mm_2000",
+   "width_mm": 0.3,
+   "pulls": 2000,
+   "thread_px": 0.9,
+   "mse": 0.1149
+  }
+ ],
+ "female": [
+  {
+   "config": "hairline_500",
+   "width_mm": 0.0,
+   "pulls": 500,
+   "mse": 0.2418
+  },
+  {
+   "config": "hairline_1000",
+   "width_mm": 0.0,
+   "pulls": 1000,
+   "mse": 0.218
+  },
+  {
+   "config": "thick_0.15mm_500",
+   "width_mm": 0.15,
+   "pulls": 500,
+   "thread_px": 0.45,
+   "mse": 0.2301
+  },
+  {
+   "config": "thick_0.2mm_500",
+   "width_mm": 0.2,
+   "pulls": 500,
+   "thread_px": 0.6,
+   "mse": 0.2263
+  },
+  {
+   "config": "thick_0.3mm_500",
+   "width_mm": 0.3,
+   "pulls": 500,
+   "thread_px": 0.9,
+   "mse": 0.2188
+  },
+  {
+   "config": "hairline_2000",
+   "width_mm": 0.0,
+   "pulls": 2000,
+   "mse": 0.1777
+  },
+  {
+   "config": "hairline_2000",
+   "width_mm": 0.0,
+   "pulls": 2000,
+   "mse": 0.1777
+  },
+  {
+   "config": "thick_0.15mm_2000",
+   "width_mm": 0.15,
+   "pulls": 2000,
+   "thread_px": 0.45,
+   "mse": 0.144
+  },
+  {
+   "config": "thick_0.2mm_2000",
+   "width_mm": 0.2,
+   "pulls": 2000,
+   "thread_px": 0.6,
+   "mse": 0.1337
+  },
+  {
+   "config": "thick_0.3mm_2000",
+   "width_mm": 0.3,
+   "pulls": 2000,
+   "thread_px": 0.9,
+   "mse": 0.1146
+  }
+ ]
+}

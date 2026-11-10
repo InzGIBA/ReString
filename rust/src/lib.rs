@@ -1224,6 +1224,117 @@ fn save_gif(path: String, images: Vec<PyRef<'_, Image>>, fps: u16) -> PyResult<u
     Ok(images.len())
 }
 
+/// One anti-aliased thick segment. Pixel centers sit at integer coordinates
+/// (the convention zingl_line draws with); coverage = clamp(1 - (distance to
+/// segment - half_width), 0, 1), a 1-px linear falloff in the same spirit as
+/// the Zingl AA. Returns (rows, cols, coverage); indices may fall outside a
+/// canvas near the edges, callers clamp when stamping. Exposed as
+/// _core.thick_line for golden tests, mirroring line_aa.
+#[pyfunction]
+fn thick_line(r0: i64, c0: i64, r1: i64, c1: i64, half_width: f64) -> (Vec<i64>, Vec<i64>, Vec<f64>) {
+    let (ay, ax) = (r0 as f64, c0 as f64);
+    let (dry, dcx) = ((r1 - r0) as f64, (c1 - c0) as f64);
+    let len2 = dry * dry + dcx * dcx;
+    let reach = (half_width + 1.0).ceil() as i64;
+    let mut rr = Vec::new();
+    let mut cc = Vec::new();
+    let mut cov = Vec::new();
+    for r in (r0.min(r1) - reach)..=(r0.max(r1) + reach) {
+        for c in (c0.min(c1) - reach)..=(c0.max(c1) + reach) {
+            let (py, px) = (r as f64, c as f64);
+            let t = if len2 > 0.0 {
+                (((py - ay) * dry + (px - ax) * dcx) / len2).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let (cy, cx) = (ay + t * dry, ax + t * dcx);
+            let dist = ((py - cy) * (py - cy) + (px - cx) * (px - cx)).sqrt();
+            let coverage = (1.0 - (dist - half_width)).clamp(0.0, 1.0);
+            if coverage > 0.0 {
+                rr.push(r);
+                cc.push(c);
+                cov.push(coverage);
+            }
+        }
+    }
+    (rr, cc, cov)
+}
+
+/// Physical thread model: render with segments of the given pixel width
+/// (thread_px), drop-in parallel of render_bw with thick stamping. Same
+/// accumulation and end-clamp semantics.
+#[pyfunction(signature = (order, nails, strength, in_w, in_h, out_w, out_h, white, thread_px))]
+fn render_bw_thick(
+    order: Vec<u64>,
+    nails: Vec<(i64, i64)>,
+    strength: f64,
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+    thread_px: f64,
+) -> Image {
+    let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
+    let half_width = thread_px / 2.0;
+    let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h];
+    for pair in order.windows(2) {
+        let (a, b) = (pair[0] as usize, pair[1] as usize);
+        let (rr, cc, cov) = thick_line(nails[a].0, nails[a].1, nails[b].0, nails[b].1, half_width);
+        for k in 0..rr.len() {
+            let r = rr[k].clamp(0, out_h as i64 - 1) as usize;
+            let c = cc[k].clamp(0, out_w as i64 - 1) as usize;
+            canvas[r * out_w + c] += cov[k] * strength;
+        }
+    }
+    for v in canvas.iter_mut() {
+        *v = v.clamp(0.0, 1.0);
+    }
+    Image { data: canvas, w: out_w, h: out_h, ch: 1 }
+}
+
+/// Physical thread model for interleaved RGB pull orders, parallel of
+/// render_rgb with thick stamping.
+#[pyfunction(signature = (orders, nails, strengths, in_w, in_h, out_w, out_h, white, thread_px))]
+fn render_rgb_thick(
+    orders: Vec<Vec<u64>>,
+    nails: Vec<(i64, i64)>,
+    strengths: Vec<f64>,
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+    thread_px: f64,
+) -> PyResult<Image> {
+    if strengths.len() != orders.len() {
+        return Err(PyValueError::new_err(
+            "render_rgb_thick needs one strength per channel order",
+        ));
+    }
+    let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
+    let colors: [[f64; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let half_width = thread_px / 2.0;
+    let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h * 3];
+    for step in 0..orders.first().map(|o| o.len().saturating_sub(1)).unwrap_or(0) {
+        for (color_idx, order) in orders.iter().enumerate() {
+            let (a, b) = (order[step] as usize, order[step + 1] as usize);
+            let (rr, cc, cov) = thick_line(nails[a].0, nails[a].1, nails[b].0, nails[b].1, half_width);
+            for k in 0..rr.len() {
+                let r = rr[k].clamp(0, out_h as i64 - 1) as usize;
+                let c = cc[k].clamp(0, out_w as i64 - 1) as usize;
+                for ch in 0..3 {
+                    canvas[(r * out_w + c) * 3 + ch] += colors[color_idx][ch] * cov[k] * strengths[color_idx];
+                }
+            }
+        }
+    }
+    for v in canvas.iter_mut() {
+        *v = v.clamp(0.0, 1.0);
+    }
+    Ok(Image { data: canvas, w: out_w, h: out_h, ch: 3 })
+}
+
 /// Render a B/W pull order at the given resolution (port of
 /// canvas.pull_order_to_array_bw; nail scaling included).
 #[pyfunction]
@@ -1769,6 +1880,9 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(animate_bw, m)?)?;
     m.add_function(wrap_pyfunction!(animate_rgb, m)?)?;
     m.add_function(wrap_pyfunction!(save_gif, m)?)?;
+    m.add_function(wrap_pyfunction!(thick_line, m)?)?;
+    m.add_function(wrap_pyfunction!(render_bw_thick, m)?)?;
+    m.add_function(wrap_pyfunction!(render_rgb_thick, m)?)?;
     m.add_function(wrap_pyfunction!(mse, m)?)?;
     m.add_function(wrap_pyfunction!(corr, m)?)?;
     m.add_function(wrap_pyfunction!(ssim, m)?)?;

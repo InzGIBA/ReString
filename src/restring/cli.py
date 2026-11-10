@@ -34,7 +34,6 @@ def build_parser():
     parser.add_argument('--project', action="store", dest="project", default=None)
     parser.add_argument('--project-out', action="store", dest="project_out", default=None)
     parser.add_argument('--poster', action="store", dest="poster", default=None)
-    parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size", default=260)
     parser.add_argument('--number-every', action="store", type=int, dest="number_every", default=10)
     parser.add_argument('--poster-preview', action="store_true")
     parser.add_argument('--anim', action="store", dest="anim", default=None)
@@ -42,11 +41,19 @@ def build_parser():
     parser.add_argument('--wb', action="store_true")
     parser.add_argument('--rgb', action="store_true")
     parser.add_argument('--rect', action="store_true")
+    parser.add_argument('--realistic', action="store_true")
+    parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size",
+                        default=None,
+                        help="board size in mm: poster printing size (default 260), or the "
+                             "physical size behind --realistic (default 400)")
+    parser.add_argument('--thread-width', action="store", type=float, dest="thread_width",
+                        default=0.2)
     return parser
 
 
 def write_poster(proj, args):
-    svg = poster_svg(proj, canvas_size_mm=args.canvas_size,
+    canvas_size = args.canvas_size if args.canvas_size is not None else 260
+    svg = poster_svg(proj, canvas_size_mm=canvas_size,
                      number_every=args.number_every, show_preview=args.poster_preview)
     Path(args.poster).write_text(svg)
     logger.info(f"Poster written: {args.poster}")
@@ -126,6 +133,9 @@ def main(argv=None):
         wb=args.wb,
         weight_peak=args.weight_peak,
         min_chord=args.min_chord,
+        realistic=args.realistic,
+        canvas_size=args.canvas_size if args.canvas_size is not None else 400,
+        thread_width=args.thread_width,
     )
 
     img = _core.Image.load(args.input_file)
@@ -171,7 +181,8 @@ def main(argv=None):
             pull_orders=orders,
             input_digest=digest,
         )
-        lengths_mm = thread_lengths_mm(proj, args.canvas_size)
+        canvas_mm = args.canvas_size if args.canvas_size is not None else 260
+        lengths_mm = thread_lengths_mm(proj, canvas_mm)
         if mode == "rgb":
             logger.info("Thread lengths: " + "/".join(f"{length / 1000:.0f}" for length in lengths_mm) + " m")
         else:

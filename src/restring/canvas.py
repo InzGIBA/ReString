@@ -20,32 +20,38 @@ def line_aa(r0, c0, r1, c1):
     return _core.line_aa(r0, c0, r1, c1)
 
 
-def pull_order_to_array_bw(order, canvas, nails, strength, shape=None):
-    """Render a pull order onto a canvas of the given value."""
+def pull_order_to_array_bw(order, canvas, nails, strength, shape=None, thread_px=None):
+    """Render a pull order onto a canvas of the given value. With `thread_px`
+    set (physical thread model), segments stamp with the given pixel width;
+    None keeps the classic 1-px hairline."""
     h, w, _ = canvas.shape()
     white = canvas.pixel(0, 0, 0) >= 0.5
     in_h, in_w = shape[:2] if shape is not None else (h, w)
-    return _core.render_bw(
-        [int(i) for i in order],
-        [(int(n[0]), int(n[1])) for n in nails],
-        float(strength), in_w, in_h, w, h, white,
-    )
+    order_int = [int(i) for i in order]
+    nails_int = [(int(n[0]), int(n[1])) for n in nails]
+    if thread_px is not None:
+        return _core.render_bw_thick(order_int, nails_int, float(strength),
+                                     in_w, in_h, w, h, white, float(thread_px))
+    return _core.render_bw(order_int, nails_int, float(strength), in_w, in_h, w, h, white)
 
 
-def pull_order_to_array_rgb(orders, canvas, nails, colors=None, strength=0.1, shape=None):
+def pull_order_to_array_rgb(orders, canvas, nails, colors=None, strength=0.1, shape=None,
+                            thread_px=None):
     """Render interleaved per-channel pull orders (fixed RGB thread colors).
 
     `strength` is one float applied to every channel or a per-channel
     sequence of the same length as `orders` (auto export strength resolves
-    per channel from each channel's actual pull count).
+    per channel from each channel's actual pull count). `thread_px` switches
+    to the physical thread model like the B/W renderer.
     """
     h, w, _ = canvas.shape()
     white = canvas.pixel(0, 0, 0) >= 0.5
     in_h, in_w = shape[:2] if shape is not None else (h, w)
     strengths = ([float(s) for s in strength] if isinstance(strength, (list, tuple))
                  else [float(strength)] * len(orders))
-    return _core.render_rgb(
-        [[int(i) for i in order] for order in orders],
-        [(int(n[0]), int(n[1])) for n in nails],
-        strengths, in_w, in_h, w, h, white,
-    )
+    orders_int = [[int(i) for i in order] for order in orders]
+    nails_int = [(int(n[0]), int(n[1])) for n in nails]
+    if thread_px is not None:
+        return _core.render_rgb_thick(orders_int, nails_int, strengths,
+                                      in_w, in_h, w, h, white, float(thread_px))
+    return _core.render_rgb(orders_int, nails_int, strengths, in_w, in_h, w, h, white)

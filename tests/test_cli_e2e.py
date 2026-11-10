@@ -172,6 +172,26 @@ def test_cli_anim_end_to_end(tmp_path, caplog):
         main(["-i", str(input_file), "-o", str(tmp_path / "out3.png"), "--anim", str(anim_file)])
 
 
+def test_cli_realistic_thread_width(tmp_path, caplog):
+    import logging
+
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    with caplog.at_level(logging.INFO):
+        main(["-i", str(input_file), "-o", str(tmp_path / "real.png"), "-d", "1200",
+              "-l", "80", "--realistic", "--canvas-size", "400", "--thread-width", "0.2"])
+
+    # the acceptance command: thread_px = 0.2 mm * 1200 px / 400 mm = 0.6 px
+    assert any("thread 0.60 px" in r.message for r in caplog.records)
+    assert any("below 1 px" in r.message for r in caplog.records)
+
+    real = load_gray(tmp_path / "real.png")
+    assert real.shape == (1200, 1200)
+    assert real.min() >= 0.0 and real.max() <= 1.0
+
+
 def test_resolve_export_strength():
     # fitted k = 104.0, residual band x1.06 (scripts/fit_export_strength.py)
     assert resolve_export_strength(1000) == pytest.approx(0.104)  # sweep anchor: best 0.1

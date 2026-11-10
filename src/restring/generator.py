@@ -38,6 +38,24 @@ class Config:
     wb: bool = False
     weight_peak: float | None = None
     min_chord: float | None = None
+    realistic: bool = False
+    canvas_size: float = 400
+    thread_width: float = 0.2
+
+
+def _thread_px(config: Config, side_len: int):
+    """Thread width in export pixels for the physical thread model, or None
+    for the classic hairline. Below 1 px the two are near-equivalent; the
+    physical width is honored anyway when the user asked for realistic."""
+    if not config.realistic:
+        return None
+    thread_px = config.thread_width * side_len / config.canvas_size
+    if thread_px < 1.0:
+        logger.info(f"Realistic render: thread {thread_px:.2f} px at export "
+                    f"(below 1 px, close to the classic hairline)")
+    else:
+        logger.info(f"Realistic render: thread {thread_px:.2f} px at export")
+    return thread_px
 
 
 def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, weights=None,
@@ -101,6 +119,7 @@ def generate_rgb(img, shape, nails, config: Config):
         nails,
         strength=exports,
         shape=shape,
+        thread_px=_thread_px(config, config.side_len),
     )
     return result, orders
 
@@ -135,5 +154,6 @@ def generate_bw(img, shape, nails, config: Config):
         nails,
         export,
         shape=shape,
+        thread_px=_thread_px(config, config.side_len),
     )
     return result, pull_order

@@ -16,7 +16,7 @@ import pytest
 from _helpers import image_from_numpy, image_to_numpy
 from restring import _core
 from restring.canvas import init_canvas, line_aa, pull_order_to_array_bw
-from restring.generator import Config, create_art, generate_rgb
+from restring.generator import Config, create_art, generate_bw, generate_rgb
 from restring.nails import create_circle_nail_positions
 
 pytestmark = pytest.mark.skipif(_core is None, reason="Rust core not built")
@@ -51,6 +51,53 @@ def test_line_aa_golden_exact(golden):
     assert list(got[0]) == rr
     assert list(got[1]) == cc
     assert np.allclose(got[2], val, atol=1e-9)
+
+
+# Frozen thick-segment outputs: (segment, half_width, rr, cc, coverage) with
+# coverage rounded to 12 decimals. Pixel centers sit on integer coordinates,
+# so a horizontal segment at hw 0.5 covers its row fully (distance 0), the
+# neighbor rows at half (distance 1: 1 - (1 - 0.5)), and the endcap corners
+# at 1 - (sqrt(2) - 0.5) = 0.0858. Sum of coverage approximates width * length.
+THICK_LINE_GOLDENS = [
+    ((0, 0, 7, 0), 0.5,
+     [-1, -1, -1, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8],
+     [-1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1],
+     [0.085786437627, 0.5, 0.085786437627, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5,
+      0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 1.0, 0.5, 0.085786437627, 0.5, 0.085786437627]),
+    ((0, 0, 7, 7), 1.0,
+     [-1, -1, -1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5,
+      5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8],
+     [-1, 0, 1, -1, 0, 1, 2, -1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 1, 2, 3, 4, 5, 2, 3, 4, 5, 6, 3, 4, 5, 6,
+      7, 4, 5, 6, 7, 8, 5, 6, 7, 8, 6, 7, 8],
+     [0.585786437627, 1.0, 0.585786437627, 1.0, 1.0, 1.0, 0.585786437627, 0.585786437627, 1.0, 1.0,
+      1.0, 0.585786437627, 0.585786437627, 1.0, 1.0, 1.0, 0.585786437627, 0.585786437627, 1.0, 1.0,
+      1.0, 0.585786437627, 0.585786437627, 1.0, 1.0, 1.0, 0.585786437627, 0.585786437627, 1.0, 1.0,
+      1.0, 0.585786437627, 0.585786437627, 1.0, 1.0, 1.0, 0.585786437627, 0.585786437627, 1.0, 1.0,
+      1.0, 0.585786437627, 1.0, 0.585786437627]),
+    ((0, 0, 5, 2), 1.5,
+     [-2, -2, -2, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
+      4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7],
+     [-1, 0, 1, -2, -1, 0, 1, 2, -2, -1, 0, 1, 2, -2, -1, 0, 1, 2, 3, -1, 0, 1, 2, 3, -1, 0, 1, 2, 3,
+      -1, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 1, 2, 3],
+     [0.2639320225, 0.5, 0.2639320225, 0.2639320225, 1.0, 1.0, 1.0, 0.2639320225, 0.5, 1.0, 1.0, 1.0,
+      0.643046618229, 0.271655941875, 1.0, 1.0, 1.0, 1.0, 0.085960603698, 0.828741956407, 1.0, 1.0,
+      1.0, 0.457351280052, 0.457351280052, 1.0, 1.0, 1.0, 0.828741956407, 0.085960603698, 1.0, 1.0,
+      1.0, 1.0, 0.271655941875, 0.643046618229, 1.0, 1.0, 1.0, 0.5, 0.2639320225, 1.0, 1.0, 1.0,
+      0.2639320225, 0.2639320225, 0.5, 0.2639320225]),
+    ((3, 3, 3, 3), 1.0,
+     [2, 2, 2, 3, 3, 3, 4, 4, 4],
+     [2, 3, 4, 2, 3, 4, 2, 3, 4],
+     [0.585786437627, 1.0, 0.585786437627, 1.0, 1.0, 1.0, 0.585786437627, 1.0, 0.585786437627]),
+]
+
+
+@pytest.mark.parametrize("golden", THICK_LINE_GOLDENS)
+def test_thick_line_golden_exact(golden):
+    seg, hw, rr, cc, cov = golden
+    got_rr, got_cc, got_cov = _core.thick_line(*seg, hw)
+    assert list(got_rr) == rr
+    assert list(got_cc) == cc
+    assert np.allclose(got_cov, cov, atol=1e-11)
 
 
 @pytest.mark.parametrize("golden", LINE_AA_CHECKSUMS)
@@ -300,3 +347,32 @@ def test_render_bw_stays_in_range():
     rendered = pull_order_to_array_bw(order, init_canvas((80, 80)), NAILS, -0.3)
     arr = image_to_numpy(rendered)
     assert arr.min() >= 0.0 and arr.max() <= 1.0
+
+
+def test_thick_render_ink_conservation():
+    # hand-checked: total ink equals strength * sum of segment coverage,
+    # no clamping in this brightness range
+    order = [0, 1, 2]
+    render = pull_order_to_array_bw(order, init_canvas(SHAPE), NAILS, -0.1, thread_px=2.0)
+    arr = image_to_numpy(render)
+    expected = 0.0
+    for a, b in ((0, 1), (1, 2)):
+        _, _, cov = _core.thick_line(NAILS[a][0], NAILS[a][1], NAILS[b][0], NAILS[b][1], 1.0)
+        expected += sum(cov)
+    expected *= 0.1
+    assert abs((1.0 - arr).sum() - expected) < 1e-9
+
+
+def test_thick_render_converges_to_classic_at_subpixel_width():
+    # at sub-pixel thread widths the physical model draws the same chords as
+    # the classic hairline with a near-identical coverage profile
+    rng = np.random.default_rng(5)
+    img = image_from_numpy(rng.random((64, 64, 3)))
+    classic, classic_order = generate_bw(img, SHAPE, NAILS,
+                                         Config(side_len=64, pull_amount=60, export_strength=0.1))
+    thick, thick_order = generate_bw(img, SHAPE, NAILS,
+                                     Config(side_len=64, pull_amount=60, export_strength=0.1,
+                                            realistic=True, thread_width=0.5, canvas_size=64))
+    assert thick_order == classic_order  # the flag changes rendering only
+    diff = _core.mse(thick, classic)
+    assert diff < 0.005  # measured: 0.0043 at thread_px 0.5

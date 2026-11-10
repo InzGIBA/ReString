@@ -6,7 +6,7 @@
 | Depends on | none (shares the `--canvas-size` flag name with T-09 if both land — merge is cosmetic) |
 | Unlocks | realistic previews; physically grounded presets |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (ec3fe7f) |
 
 ## Why
 

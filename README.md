@@ -104,6 +104,9 @@ restring -i portrait.png -o out.png --rect -n 2 -l 3000
 | `--project-out <path>` | save the nail layout and pull order as a `.restring` project alongside the PNG | off |
 | `--project <path>` | re-render from a `.restring` project instead of an image: skips the search, applies the current `-s` and `-d` | off |
 | `--anim <path>` | with `--project`: animated GIF of the winding sequence. `--anim-frames` sets the frame count, 180 is about 6 s at 30 fps. A 2000-pull project at the default 600 px export lands near 45 MB; `-d 450` brings it to about 28 MB, `-d 380` under 25 MB | off |
+| `--realistic` | physical thread model: threads of `--thread-width` mm (default 0.2) on a `--canvas-size` mm board (default 400). At exports well above 300 px the 0.3 mm width beats the hairline by 35 percent MSE. The search never changes | hairline |
+| `--thread-width <mm>` | thread diameter for `--realistic`. Birsak used 0.15, typical polyester sits near 0.2 | 0.2 |
+| `--canvas-size <mm>` | board size: the poster printing size (default 260 for `--poster`) or the physical size behind `--realistic` (default 400) | per feature |
 
 Nails sit evenly on the perimeter. The circle starts at 9 o'clock and runs clockwise. The rectangle starts at the top left corner. The pull order is continuous by construction, so you wind one uncut thread.
 

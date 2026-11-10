@@ -14,6 +14,7 @@ Every CLI flag, measured on face-centered portrait fixtures (`tests/data/`). Eac
 | `-d` | 300 | exporting above the working grid hurts |
 | `--weight` | 3.0 for portraits, off for other subjects | center MSE falls 24 to 28 percent, global MSE rises 3 percent |
 | `--min-chord` | off | the greedy never picks short chords. Thresholds bite only past 230 px and cost up to 24 percent MSE |
+| `--realistic` | on when exporting well above 300 px | 0.3 mm thread at a 400 mm board beats the hairline by 35 percent at the 1200 px export |
 
 ## Thread count and export strength
 
@@ -92,6 +93,10 @@ Measured on both portrait fixtures at 2000 threads (`--rect`, `-s 0.05`): center
 ## Minimum chord
 
 `--min-chord <px>` bans candidate chords shorter than the distance in working-grid pixels. Measured on both portrait fixtures at 2000 threads (`--rect`, `-s 0.05`): the unfiltered greedy already avoids short pulls. The natural minimum chord sits at 229.5 px on the male fixture and 148 px on the female fixture. Thresholds up to 200 px leave the pull order untouched, and at 300 px global MSE rises 13 to 24 percent. Keep the flag off. Full curve and the chord distribution: [research/min-chord-experiment.md](research/min-chord-experiment.md).
+
+## Physical thread model
+
+`--realistic` switches the render to threads of a physical width: `--thread-width` millimeters of thread on a `--canvas-size` millimeter board, scaled to the export. At the default 300 px export the width computes below 0.15 px and the render barely differs from the hairline. At large exports it matters: 0.3 mm on a 400 mm board (0.9 px at the 1200 px export) matches the hairline's double pull budget at 500 pulls and beats the hairline by 35 percent at 2000 pulls. The search never changes, only the render. Numbers: [research/thread-model-experiment.md](research/thread-model-experiment.md).
 
 ## Presets
 
