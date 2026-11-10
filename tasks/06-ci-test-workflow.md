@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | T-07 release workflow; safe refactoring for everything else |
 | Size | S (under a day) |
-| Status | [ ] not started |
+| Status | [x] done (0eeb200) |
 
 ## Why
 

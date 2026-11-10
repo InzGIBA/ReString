@@ -1,0 +1,40 @@
+# Continuous integration: build the Rust core and run the full suite on three
+# operating systems. T-07 (release workflow) reuses these steps and adds wheel
+# building and publishing on top.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # the compiled core (restring._core) builds via maturin during `uv sync`,
+      # so a Rust toolchain must exist before sync; GitHub runners ship a C
+      # linker, the zig recipe in docs/architecture.md is not needed here
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+
+      # uv reads .python-version (3.14) and installs that interpreter
+      - uses: astral-sh/setup-uv@v5
+
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run pytest

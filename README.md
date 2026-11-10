@@ -1,3 +1,5 @@
+[![CI](https://github.com/InzGIBA/ReString/actions/workflows/ci.yml/badge.svg)](https://github.com/InzGIBA/ReString/actions/workflows/ci.yml)
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="assets/hero-light.svg">
@@ -150,10 +152,12 @@ uv sync
 ### Checks
 
 ```bash
-uv run pytest                   # 61 tests, ~6 s
+uv run pytest                   # 62 tests, ~6 s
 uv run ruff check .
 uv run python scripts/benchmark.py --label before   # or after, then --plot
 ```
+
+CI runs the same checks on every push to main and every pull request, on linux, macos and windows (`.github/workflows/ci.yml`).
 
 ## Documentation
 
