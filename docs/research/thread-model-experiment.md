@@ -33,7 +33,7 @@ Match points for the pre-registered question:
 
 At a 1200 px export the classic hairline stamps every touched pixel at full coverage: 1 px of ink per pixel of line. A physical thread below 1 px stamps fractional coverage, proportionally less ink per pixel. The same pull order reads as less over-darkened, and MSE against the reference falls. The effect grows with the export-to-working-grid ratio, consistent with the export-resolution finding in the tuning guide: exporting above the 300 px working grid hurts precisely because the hairline over-inks.
 
-This also means `--realistic` at sub-pixel widths is not just cosmetic: at 0.9 px it doubles as an ink-proportional large-export renderer.
+This also means `--realistic` at sub-pixel widths does more than look different: at 0.9 px it doubles as an ink-proportional large-export renderer.
 
 ## Recommendation
 

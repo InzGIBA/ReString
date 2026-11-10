@@ -55,7 +55,7 @@ requested, ~1000 distinct survive the pixel-grid dedupe):
 restring -i photo.png -o out.png --layout star:5:0.55:1500 -s 0.05
 ```
 
-## Boards you can wind
+## Boards you wind
 
 Every tile's `art.restring`-style instructions come from adding
 `--project-out` to the same command, and the winding poster with nail numbers

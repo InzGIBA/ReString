@@ -1,6 +1,6 @@
 # Multi-start greedy: the last search-strategy measurement
 
-Question (pre-registered in tasks/17-multistart-research.md): multi-start — run the greedy from several starting states, keep the best run — is the only untested member of the search-strategy family. Does the best of S runs at budget B beat a single greedy run at the same total compute B x S?
+Question (pre-registered in tasks/17-multistart-research.md): multi-start (run the greedy from several starting states, keep the best run) is the only untested member of the search-strategy family. Does the best of S runs at budget B beat a single greedy run at the same total compute B x S?
 
 Answer: no, by the widest margin of the whole family. On both fixtures, every S in 2/4/8/16, both start axes (starting nail, subset seed) and all three budgets, the best multi-start run loses to the greedy compute control. The gain is at best exactly zero: starting-nail rotations produce bit-identical pull orders to the plain run, so multi-start by start diversity delivers precisely the single-run result while spending S times the compute. The verdict closes the family: no known search modification beats spending the same compute on more threads.
 
@@ -33,7 +33,7 @@ Every multi-start configuration loses to the matched-compute greedy control, mos
 
 Two distinct findings hide in the verdict:
 
-1. Starting-nail rotations produce pull orders with identical final MSE to four decimals — the greedy is start-invariant here. The first chord from any nail on the ring is the same canvas-crossing dark-region chord up to which endpoints it touches, and after a handful of pulls every run sits in the same high-improvement regime. The candidate space from every perimeter point is the same dense all-pairs line cache, so "where you start" selects among chords that all exist in every other run's future anyway. Best-of-S by rotation spends S times the compute to return the single-run result.
+1. Starting-nail rotations produce pull orders with identical final MSE to four decimals: the greedy is start-invariant here. The first chord from any nail on the ring is the same canvas-crossing dark-region chord up to which endpoints it touches, and after a handful of pulls every run sits in the same high-improvement regime. The candidate space from every perimeter point is the same dense all-pairs line cache, so "where you start" selects among chords that all exist in every other run's future anyway. Best-of-S by rotation spends S times the compute to return the single-run result.
 
 2. Subset-seed diversity is a loss multiplied. One `-r 100` run already gives up 2 to 4 percent MSE to the full scan; best-of-S recovers a sliver (0.1752 to 0.1735 at B 500 for S 2 to 16) but never reaches the full scan, let alone the deeper control. Diversity over subsampling trades a real quality loss for a random redraw, and the redraws correlate: every seed stars the same 100-of-298 information diet.
 

@@ -6,7 +6,7 @@ labels: ["enhancement"]
 
 **Problem**
 
-What can you not do today, or what does the current behavior make harder? Describe the situation you are in, not the solution.
+What is impossible today, or where does the current behavior fall short? Describe the situation you are in, not the solution.
 
 **Proposed solution**
 

@@ -1,6 +1,6 @@
 # The `.restring` project format
 
-A `.restring` file stores everything needed to re-render a finished result without re-running the search: the nail layout and the nail-by-nail pull orders. The format is plain JSON, so any tool can read it. This document describes schema version 1.
+A `.restring` file stores everything needed to re-render a finished result without re-running the search: the nail layout and the nail-by-nail pull orders. The format is plain JSON, so any tool reads it. This document describes schema version 1.
 
 ## Example
 
@@ -46,4 +46,4 @@ The CLI re-renders without a search: `restring --project result.restring -o out.
 
 ## Compatibility
 
-Version 1 is a promise: files written today keep loading. Future writers may add fields; readers ignore unknown fields. A future schema bump raises `version` and this document gains a section for the new version; the loader rejects versions beyond its knowledge with a clear error instead of guessing.
+Version 1 is a promise: files written today keep loading. Future writers add fields; readers ignore unknown fields. A future schema bump raises `version` and this document gains a section for the new version; the loader rejects versions beyond its knowledge with a clear error instead of guessing.

@@ -2,7 +2,7 @@
 
 Question (pre-registered in tasks/14-adaptive-nail-placement.md): a portrait's detail lives in the eyes and mouth while the forehead is flat. Does placing the same nail count where the Sobel gradient is dense beat uniform perimeters?
 
-Answer: no, decisively. Adaptive placement loses to uniform on every tested combination — 24 facets across two fixtures, two layouts, three nail counts and two budgets. Global MSE never improves (best case +0.0 percent, worst case -12.4 percent) and center MSE degrades by 1.7 to 52.6 percent. The pre-registered bar (adopt on 3 percent global or 8 percent center gain on both fixtures) fails everywhere. No flag ships; the question closes.
+Answer: no, decisively. Adaptive placement loses to uniform on every tested combination: 24 facets across two fixtures, two layouts, three nail counts and two budgets. Global MSE never improves (best case +0.0 percent, worst case -12.4 percent) and center MSE degrades by 1.7 to 52.6 percent. The pre-registered bar (adopt on 3 percent global or 8 percent center gain on both fixtures) fails everywhere. No flag ships; the question closes.
 
 ## The algorithm
 
@@ -34,9 +34,9 @@ Full tables: `docs/img/adaptive_nails_experiment.json`. Gain summary across all 
 
 Two forces work against gradient concentration:
 
-1. Nails do not paint where they sit. A pull is a chord between two perimeter nails, and the chord's ink lands along its whole length, including the interior. Detail in the eyes is reachable by chords between any two perimeter points that cross the eyes — uniform spacing already supplies those chords. Moving both endpoints onto the busy edges does not aim chords at the eyes; it just thins the nail coverage that feeds the flat regions, which then render under-inked.
+1. Nails do not paint where they sit. A pull is a chord between two perimeter nails, and the chord's ink lands along its whole length, including the interior. Detail in the eyes is reachable by chords between any two perimeter points that cross the eyes, and uniform spacing already supplies those chords. Moving both endpoints onto the busy edges does not aim chords at the eyes and only thins the nail coverage that feeds the flat regions, which then render under-inked.
 
-2. Starved regions poison the search. With fewer nails near flat areas, chords that would have darkened those areas vanish from the candidate pool entirely; the search spends its budget on the dense edge instead, and the whole render degrades — visible as the large center-box losses at 2000 pulls, where the budget is long enough for the starvation to compound.
+2. Starved regions poison the search. With fewer nails near flat areas, chords that would have darkened those areas vanish from the candidate pool entirely; the search spends its budget on the dense edge instead, and the whole render degrades, visible as the large center-box losses at 2000 pulls, where the budget is long enough for the starvation to compound.
 
 The survey's per-pixel error caps and Sobel boosts (isandrocks) work because they change which candidate pull wins during the scan. Placement happens before any pixel error exists, so it optimizes a proxy (gradient density) instead of the objective (render error).
 

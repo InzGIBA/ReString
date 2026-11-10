@@ -37,7 +37,7 @@ So the suggested starting values 5, 10, 20 and 30 px sit three to seven times be
 
 The 500-thread budget shows the same shape: identical rows up to 250 px, then degradation.
 
-The first change appears at 200 px on the female fixture (natural minimum 148 px): a handful of pulls get replaced, global MSE stays flat. At 250 px the filter starts removing chords the search actually wants and global MSE rises 0.3 to 2 percent. At 300 px the damage is clear: global MSE up 24 percent on the male fixture and 13 percent on the female. Center MSE improves slightly at 300 px (0.0300 to 0.0242 on the female fixture) because the forced detours happen to concentrate ink on the face, but the global cost dwarfs the local gain.
+The first change appears at 200 px on the female fixture (natural minimum 148 px): a handful of pulls get replaced, global MSE stays flat. At 250 px the filter starts removing chords the search wants and global MSE rises 0.3 to 2 percent. At 300 px the damage is clear: global MSE up 24 percent on the male fixture and 13 percent on the female. Center MSE improves slightly at 300 px (0.0300 to 0.0242 on the female fixture) because the forced detours happen to concentrate ink on the face, but the global cost dwarfs the local gain.
 
 ## Dead-end recovery
 

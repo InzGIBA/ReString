@@ -45,7 +45,7 @@ Every field has the documented default; pass only what you change.
 
 ## Examples
 
-Minimal — defaults render a rect-board black-and-white piece:
+Minimal: defaults render a rect-board black-and-white piece:
 
 ```python
 from restring import generate
@@ -54,7 +54,7 @@ result = generate("portrait.png")
 result.image.save_png("out.png")
 ```
 
-Portrait preset — more threads, fitted strength, center weighting:
+Portrait preset: more threads, fitted strength, center weighting:
 
 ```python
 from restring import GenerateOptions, generate
@@ -65,7 +65,7 @@ result.image.save_png("out.png")
 print(result.stats)
 ```
 
-Project round-trip — save the winding instructions, re-render later:
+Project round-trip: save the winding instructions, re-render later:
 
 ```python
 from restring import GenerateOptions, Result, generate
@@ -83,7 +83,7 @@ again = load("art.restring")
 
 ## numpy bridge
 
-Analysis scripts that want numpy matrices import the dev bridge by path — the runtime package stays numpy-free:
+Analysis scripts that want numpy matrices import the dev bridge by path, and the runtime package stays numpy-free:
 
 ```python
 import sys

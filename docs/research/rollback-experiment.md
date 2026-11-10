@@ -29,4 +29,4 @@ Script: `scripts/rollback_experiment.py`, raw data `docs/img/rollback_experiment
 
 ## Verdict
 
-Improvement candidate #4 (damione1's rollback) closes for this code base: the stagnation guard already prevents non-improving pulls from entering the order, so best-prefix truncation is a no-op. `--rollback` ships default off and never changes any output. The guard itself is load-bearing — if a future feature ever applies non-improving pulls (a plateau-walk search, for instance), the rollback tracking is already in place to clean up after it.
+Improvement candidate #4 (damione1's rollback) closes for this code base: the stagnation guard already prevents non-improving pulls from entering the order, so best-prefix truncation is a no-op. `--rollback` ships default off and never changes any output. The guard itself is load-bearing: if a future feature ever applies non-improving pulls (a plateau-walk search, for instance), the rollback tracking is already in place to clean up after it.
