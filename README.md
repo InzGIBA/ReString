@@ -6,18 +6,18 @@
   <img alt="ReString — turn any photo into string art you can wind by hand" src="assets/hero-light.svg" width="100%">
 </picture>
 
-Feed in a portrait. The greedy search picks one thread at a time — each pull is the one that moves the canvas measurably closer to the reference photo — and out comes the picture a single thread would draw around the nails, plus the nail order to wind it. Black and white output uses one thread. RGB uses three, one per channel.
+Feed in a portrait. The greedy search picks one thread at a time, and each pull moves the canvas measurably closer to the photo. The output is the picture one uncut thread draws around the nails, plus the nail-by-nail winding order. Black and white uses one thread. Color runs pick a palette: the pure RGB triple, CMY, CMYK or a JSON list of the floss colors you own.
 
 [Quick start](#quick-start) · [Usage](#usage) · [Tuning](#tuning) · [Development](#development) · [Contributing](#contributing) · [License](#license)
 
-Try it in the browser: the [playground](https://inzgiba.github.io/ReString/) runs the same core as a wasm module — drop a photo, no install. The page deploys from `web/` (`.github/workflows/pages.yml`).
+Try it in the browser: the [playground](https://inzgiba.github.io/ReString/) runs the same core as a wasm module. Drop a photo, no install. The page deploys from `web/` (`.github/workflows/pages.yml`).
 
 ## Overview
 
 - **For:** makers winding physical boards, machine and plotter owners, and anyone who wants a digital string-art render.
 - **Input:** a PNG or JPEG photo; face-centered portraits work best.
 - **Output:** a PNG render of the thread pattern; the Python API also returns the continuous nail-by-nail pull order.
-- **Scope:** greedy search, B/W or RGB, circle or rectangle nail layouts, a 300 px working grid. Building from source requires a Rust toolchain — there is no pure-Python fallback.
+- **Scope:** greedy search on a 300 px working grid, five nail-layout families, black-and-white and color palettes, `.restring` project files, printable winding posters, GIF animations and a physical thread model. Building from source requires a Rust toolchain, there is no pure-Python fallback.
 
 ![A photo becomes a thread drawing](assets/demo.jpg)
 
@@ -40,10 +40,11 @@ The project started as a 2020 university course assignment by Kaspar Valk, Kert 
   <img alt="Verified output — golden tests pin pixels and pull order" src="assets/feature-03-light.svg" width="32%">
 </picture>
 
-- **One uncut thread** — the pull order is continuous by construction, so you wind a single thread by hand or machine.
-- **Two layouts, three palettes** — nails on a circle or a rectangle border; black-on-white, white-on-black, or RGB with three interleaved threads.
-- **Custom boards** — polygon, star, multi-ring and SVG-outline layouts via `--layout star:5:0.55`, plus non-square aspect crops ([layouts guide](docs/layouts.md)).
-- **Measured, not guessed** — every flag has a degradation curve behind it in the [tuning guide](docs/tuning.md).
+- **One uncut thread**: the pull order is continuous by construction, so you wind a single thread by hand or machine.
+- **Real thread colors**: black-on-white, white-on-black, or a palette. The built-ins are RGB, CMY and CMYK, or load a JSON list of the floss colors you own. CMYK measures 42 to 45 percent better than RGB at an equal budget.
+- **Custom boards**: polygon, star, multi-ring and SVG-outline layouts via `--layout star:5:0.55`, plus non-square aspect crops ([layouts guide](docs/layouts.md)).
+- **From photo to board**: save a `.restring` project, re-render in milliseconds, print a numbered-nail poster with the thread length in meters, watch the winding as a GIF.
+- **Measured, not guessed**: every flag has a degradation curve behind it in the [tuning guide](docs/tuning.md).
 
 ## Quick start
 
@@ -183,7 +184,7 @@ Source checkouts prefix every command with `uv run`, for example `uv run restrin
 ### Checks
 
 ```bash
-uv run pytest                   # 62 tests, ~6 s
+uv run pytest                   # 211 tests, ~11 s
 uv run ruff check .
 uv run python scripts/benchmark.py --label before   # or after, then --plot
 uv run python scripts/make_gallery.py               # regenerate docs/img/gallery.png
@@ -195,22 +196,27 @@ CI runs the same checks on every push to main and every pull request, on linux, 
 
 | Document | Contents |
 |---|---|
-| [docs/architecture.md](docs/architecture.md) | how the pipeline works, the Rust core, correctness model, performance, build |
+| [docs/architecture.md](docs/architecture.md) | how the pipeline works, the Rust core, correctness model, performance, build, wasm target |
+| [docs/api.md](docs/api.md) | the 2.0 facade: `GenerateOptions`, `Result`, deprecated 1.x names |
 | [docs/tuning.md](docs/tuning.md) | every flag, degradation curves, recommended values, presets |
+| [docs/layouts.md](docs/layouts.md) | layout specs, the clockwise ordering rule, non-square boards |
+| [docs/project-format.md](docs/project-format.md) | the `.restring` schema and the compatibility promise |
+| [docs/winding.md](docs/winding.md) | printing checklist, reading the poster, buying thread |
 | [docs/history.md](docs/history.md) | the migration story: stages, numbers, rejected hypotheses |
-| [docs/research/pull-count-quality.md](docs/research/pull-count-quality.md) | when thread count helps and when quality degrades |
-| [docs/research/related-work.md](docs/research/related-work.md) | survey of string art projects, papers and their rules |
+| [docs/research/](docs/research/) | twelve experiment docs with the numbers behind every verdict, plus the related-work survey |
 
 ## Roadmap
 
-- [x] Re-run the RGB sweeps — working strength 0.05 adopted, 13 to 17 percent better MSE ([measurement](docs/research/rgb-channels-experiment.md)).
-- [x] Test the working grid above 300 px — keep 300: under 3 percent MSE at up to 2.4x time ([measurement](docs/research/grid-scale-experiment.md)).
+The 2027 backlog lives in [tasks/](tasks/README.md): 20 self-contained work orders with acceptance criteria, and the dead-end table of ideas measured and closed. Answered in 2.0:
+
+- [x] Re-run the RGB sweeps: working strength 0.05 adopted, 13 to 17 percent better MSE ([measurement](docs/research/rgb-channels-experiment.md)).
+- [x] Test the working grid above 300 px: keep 300, under 3 percent MSE at up to 2.4x time ([measurement](docs/research/grid-scale-experiment.md)).
 
 ## Contributing
 
 Issues and pull requests are welcome. Templates structure both: bug reports carry the command line and image, feature requests check the measured dead ends, research ideas state a pre-registered success bar, and the PR template asks for the measurement or test evidence.
 
-Wound a physical board? Post it under the "show and tell" label — the physical outputs are the project's best advertisement. The example gallery ([examples/gallery/](examples/gallery/)) shows the configuration families and the commands behind every tile.
+Wound a physical board? Post the photos under the "show and tell" label. Physical outputs are the best advertisement a string-art project gets. The example gallery ([examples/gallery/](examples/gallery/)) shows the configuration families and the commands behind every tile.
 
 1. Describe the problem or the proposed improvement.
 2. Make a focused change.

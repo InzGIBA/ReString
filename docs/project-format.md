@@ -17,7 +17,7 @@ A `.restring` file stores everything needed to re-render a finished result witho
   "nails": [[0, 0], [0, 4]],
   "pull_orders": [[0, 222, 226]],
   "input_digest": "sha256:2ab477ed...",
-  "restring_version": "1.3.0"
+  "restring_version": "2.0.0"
 }
 ```
 

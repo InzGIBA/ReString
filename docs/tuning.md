@@ -115,8 +115,8 @@ uv run restring -i face.png -o out.png --rect -n 4 -l 2000
 # maximum measured quality, ~1.4 s
 uv run restring -i face.png -o out.png --rect -n 2 -l 3000
 
-# physical winding, 3000 to 7000 threads
-uv run restring -i face.png -o out.png --rect -n 2 -l 3000
+# physical winding preview: thread thickness from a real board
+uv run restring -i face.png -o out.png --rect -n 2 -l 3000 --realistic --canvas-size 400 --thread-width 0.2
 ```
 
 ## RGB

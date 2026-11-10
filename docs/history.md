@@ -18,6 +18,12 @@ The project began in 2020 as a Python course assignment. Through 2026 it went th
 | `9c7d93b` | Python reference code removed | golden tests replace executable references |
 | `002b92f` | parallel line-cache rasterization | 8.4x cache build, up to 3.6x short runs |
 
+## v2.0.0, the 2027 roadmap sprint
+
+Twenty self-contained work orders ([tasks/](../tasks/README.md)) turned the generator into a full pipeline: importance weighting (`--weight`, center MSE down 24 to 28 percent on portraits), auto export strength (fitted 104/L, within 2 percent of hand-tuned), thread palettes with CMYK (42 to 45 percent better color MSE than the RGB triple), custom layouts (polygon, star, rings, SVG outlines), `.restring` project files with byte-identical re-render, a numbered-nail winding poster with thread length, a GIF animation, a physical thread model (0.3 mm beats the hairline by 35 percent at large exports), a blurred SSIM metric with monotonicity proof, wheels on PyPI, CI on three operating systems, a wasm playground and a typed 2.0 API.
+
+The research tasks closed questions with numbers instead of shipping flags: adaptive nail placement loses on all 24 measured facets, multi-start never beats spending the same compute on more threads, and min-chord plus rollback measured as no-ops. The search-strategy family now carries six negative results: beam, receding horizon, multi-scale, asymmetric penalties, add/remove local search and multi-start. Every verdict lives in [research/](research/).
+
 ## Where the time went
 
 Profiling the original Python on a 300-thread run: 46 percent in `skimage.draw.line_aa` called 63,900 times, 14 percent in the Python candidate loop. The code re-rasterized every candidate line on every iteration, though each nail pair repeats dozens of times per run.

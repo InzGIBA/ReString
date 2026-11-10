@@ -5,17 +5,19 @@ This document describes how ReString works today. For the migration story and re
 ## Pipeline
 
 ```
-Image.load          largest_square       resize              nails
-PNG or JPEG  --->   central square  ---> 300 x 300     --->  circle or rectangle
-(Rust codecs)       crop                 box/bilinear       border positions
-                                                                |
-    save_png  <---  render_bw / rgb  <---  create_art  <--------+
-    8-bit PNG       accumulate AA         greedy search
-                    lines, clip           (working canvas
-                                           in Vec<f64>)
+Image.load          largest_square/rect   resize            layout spec
+PNG or JPEG  --->   crop for the      ---> 300 x 300 --->  five families:
+(Rust codecs)       layout aspect       box/bilinear       circle, rect, polygon,
+                                                            star, rings, svg
+                                                                    |
+    PNG + .restring + poster + GIF + metrics                     create_art
+    <---  render bw/rgb/palette, thick or hairline  <---  greedy search
+          (accumulate AA lines, clip)            (optional weight, min-chord,
+                                                 rollback; working canvas
+                                                 in Vec<f64>)
 ```
 
-Everything below the Python surface runs in the Rust core `restring._core`.
+Everything below the Python surface runs in the Rust core `restring._core`. The public entry point is the 2.0 facade (`restring.api.generate`, [api.md](api.md)); the CLI and the render helpers sit on top of it.
 
 ## The Rust core
 
@@ -23,16 +25,18 @@ The `Image` class holds pixels in a `Vec<f64>` with width, height and channel co
 
 | Responsibility | Where | Notes |
 |---|---|---|
-| PNG/JPEG codecs | `Image.load`, `Image.save_png` | `image` crate, RGB float 0..1 |
+| PNG/JPEG codecs | `Image.load`, `Image.save_png` | `image` crate, RGB float 0..1, GIF behind the `gif` feature |
 | Crops and resample | `Image.largest_square`, `Image.resize` | box filter when downscaling, bilinear when upscaling |
 | Grayscale, channels | `Image.gray`, `Image.channel` | standard luminance weights |
-| Nail layouts | `circle_nails`, `rect_nails` | midpoint ellipse rasterization |
-| Line rasterizer | `line_aa` | Zingl algorithm, identical pixels to the original skimage implementation |
-| Greedy search | `create_art` | line cache, working canvas and the scan loop all in Rust |
-| Renders | `render_bw`, `render_rgb` | nail scaling included |
-| Metrics | `ssim`, `mse`, `corr` | integral-image SSIM, no dependencies |
+| Nail layouts | `circle_nails`, `rect_nails` | midpoint ellipse rasterization; polygon, star, rings and SVG sampling are pure Python (`layouts.py`) |
+| Line rasterizer | `line_aa`, `thick_line` | Zingl algorithm, pixel-identical to the original skimage port; the thick variant covers width in pixels |
+| Greedy search | `create_art` | line cache, working canvas and the scan loop all in Rust; optional importance weights, chord filter, best-prefix rollback |
+| Renders | `render_bw`, `render_rgb`, `render_palette` | nail scaling included, each with a thick variant |
+| Animation | `animate_bw`, `animate_rgb`, `save_gif` | per-pull snapshots, GIF via the `image` crate |
+| Metrics | `ssim`, `mse`, `corr`, `ssim_blur` | integral-image SSIM, box-blurred variant for thread renders, no dependencies |
+| Analysis | `Image.gradient_magnitude` | Sobel magnitude, shipped with the adaptive-placement research |
 
-The Python modules are thin wrappers. `generator.py` orchestrates the pipeline. `canvas.py`, `nails.py`, `image_transformations.py` and `metrics.py` delegate to the core. `cli.py` wires the flow end to end without numpy or pillow.
+The Python modules are thin wrappers. `api.py` is the 2.0 facade (`generate(source, options) -> Result`). `generator.py` orchestrates the search; `canvas.py`, `nails.py`, `layouts.py`, `palettes.py`, `image_transformations.py` and `metrics.py` delegate to the core or build data for it. `project.py`, `poster.py` and `animation.py` turn a finished pull order into a project file, an SVG poster and a GIF. `cli.py` wires the flow end to end without numpy or pillow.
 
 ## Greedy search
 
@@ -40,7 +44,7 @@ The Python modules are thin wrappers. `generator.py` orchestrates the pipeline. 
 
 The line cache is rasterized across cores with `std::thread::scope`. Chunks reassemble in source order, so output stays bit-identical regardless of thread count.
 
-Iteration stops after a fixed budget or after 3 pulls with no improvement, whichever comes first. The `-r` flag restricts the scan to a fixed subset drawn once by a seeded splitmix64 sampler with Floyd's algorithm, seed 42.
+Iteration stops after a fixed budget or after 3 pulls with no improvement, whichever comes first. The `-r` flag restricts the scan to a fixed subset drawn once by a seeded splitmix64 sampler with Floyd's algorithm, seed 42. Optional search-time parameters, all defaulting off and all measured first: a per-pixel importance weight map (`--weight`, `scan_candidates_weighted`), a minimum chord distance (`--min-chord`, a precomputed mask over the line cache), and best-prefix truncation (`--rollback`).
 
 ## Correctness model
 
@@ -54,7 +58,7 @@ The equivalence chain behind the goldens: the Rust rasterizer matched the Python
 
 ## Metrics
 
-Quality reports use two windowed statistics plus MSE and correlation. Plain SSIM misbehaves on thread renders: thin anti-aliased lines on white defeat the local statistics, so it peaks at 50 threads and falls while the picture improves (`docs/research/pull-count-quality.md`). The fix is a box blur before the comparison — `Image.box_blur(radius)` (separable, running sums, O(w*h)) followed by the windowed SSIM, exposed as `_core.ssim_blur`. Measured on both portrait fixtures at export strength 0.05: blurred SSIM rises monotonically along the pull series (0.60 to 0.67 on the male fixture) exactly where plain SSIM falls (0.56 to 0.30). `--metrics out.json` writes the four numbers plus pull count, nails and elapsed time after any generate run; the monotonicity property lives in `tests/test_e2e_quality.py`.
+Quality reports use two windowed statistics plus MSE and correlation. Plain SSIM misbehaves on thread renders: thin anti-aliased lines on white defeat the local statistics, so it peaks at 50 threads and falls while the picture improves (`docs/research/pull-count-quality.md`). The fix is a box blur before the comparison: `Image.box_blur(radius)` (separable, running sums, O(w*h)) followed by the windowed SSIM, exposed as `_core.ssim_blur`. Measured on both portrait fixtures at export strength 0.05: blurred SSIM rises monotonically along the pull series (0.60 to 0.67 on the male fixture) exactly where plain SSIM falls (0.56 to 0.30). `--metrics out.json` writes the four numbers plus pull count, nails and elapsed time after any generate run. The monotonicity property lives in `tests/test_e2e_quality.py`.
 
 ## Performance
 
@@ -68,7 +72,7 @@ Measured on an AMD 24-core Linux box, 300 x 300 working grid, 211 nails, portrai
 | 7000 iterations | 797 ms |
 | 2000 iterations, 422 nails | 578 ms |
 | CLI run, 300 threads end to end | 0.20 s |
-| Test suite, 46 tests | 1.8 s |
+| Test suite, 211 tests | 11 s |
 
 For comparison, the original Python stack needed 74.8 s for the 7000-iteration search. The full comparison lives in [history.md](history.md).
 
