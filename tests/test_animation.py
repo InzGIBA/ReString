@@ -85,3 +85,43 @@ def test_gif_file_signature_and_survives_quantization(tmp_path):
     loaded = _core.Image.load(str(path))  # first frame, palette-quantized
     arr = image_to_numpy(loaded)
     assert arr.mean() < 0.1  # quantized black stays black
+
+
+def test_animate_project_rgb_writes_a_gif(tmp_path):
+    import restring.animation as animation
+
+    proj = noise_project(mode="rgb")
+    path = tmp_path / "rgb.gif"
+
+    animation.animate_project(proj, path, export_strength=0.1, size=64, frames=5)
+
+    raw = path.read_bytes()
+    assert raw[:4] == b"GIF8"
+    assert len(raw) > 1000
+
+
+def test_animate_project_halves_fps_over_the_size_limit(tmp_path, caplog, monkeypatch):
+    import logging
+
+    import restring.animation as animation
+
+    monkeypatch.setattr(animation, "SIZE_LIMIT_BYTES", 10)  # force the over-limit path
+    proj = noise_project()
+    path = tmp_path / "big.gif"
+
+    with caplog.at_level(logging.WARNING, logger="restring.animation"):
+        animation.animate_project(proj, path, export_strength=0.1, size=64, frames=5)
+
+    assert any("halving fps" in r.message for r in caplog.records)
+    assert path.read_bytes()[:4] == b"GIF8"
+
+
+def test_animate_project_rgb_resolves_strength_per_channel(tmp_path):
+    import restring.animation as animation
+
+    proj = noise_project(mode="rgb")
+    path = tmp_path / "auto.gif"
+
+    animation.animate_project(proj, path, export_strength=None, size=64, frames=5)
+
+    assert path.read_bytes()[:4] == b"GIF8"

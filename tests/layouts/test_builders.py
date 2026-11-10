@@ -91,3 +91,9 @@ def test_layouts_search_end_to_end():
         assert len(order) > 1, f"{name} produced no pulls"
         assert result.shape() == (64, 64, 1)
 
+
+
+def test_star_count_below_three_is_rejected_directly():
+    # the api spec path pre-validates count, the builder keeps its own guard
+    with pytest.raises(LayoutError, match="star needs count >= 3"):
+        star(SHAPE, 5, 0.5, 2)

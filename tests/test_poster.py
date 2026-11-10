@@ -99,3 +99,7 @@ def test_board_too_large_for_page():
     proj = hand_built_project()
     with pytest.raises(ValueError, match="does not fit"):
         poster_svg(proj, canvas_size_mm=400.0)
+
+def test_poster_rejects_negative_number_every():
+    with pytest.raises(ValueError, match="number_every must be"):
+        poster_svg(hand_built_project("bw"), canvas_size_mm=200, number_every=-1)

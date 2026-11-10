@@ -331,3 +331,97 @@ def test_resolve_export_strength():
     assert resolve_export_strength(2000) == pytest.approx(0.052)  # sweep anchor: best 0.05
     assert resolve_export_strength(50) == 0.2    # clamped at the ceiling
     assert resolve_export_strength(7000) == 0.03  # clamped at the floor
+
+
+# --- CLI argument validation and the module entry point ------------------------
+
+def test_cli_rejects_conflicting_and_missing_sources(tmp_path):
+    input_file = tmp_path / "in.png"
+    save_image(input_file, np.full((32, 32), 0.4))
+    project = tmp_path / "p.restring"
+
+    with pytest.raises(SystemExit) as e:
+        main(["-i", str(input_file), "--project", str(project)])
+    assert e.value.code == 2  # argparse usage error
+
+    with pytest.raises(SystemExit) as e:
+        main([])  # neither -i nor --project
+    assert e.value.code == 2
+
+
+def test_cli_metrics_needs_generate_mode(tmp_path):
+    input_file = tmp_path / "in.png"
+    save_image(input_file, np.full((32, 32), 0.4))
+    project = tmp_path / "p.restring"
+    main(["-i", str(input_file), "--project-out", str(project), "-d", "32"])
+
+    with pytest.raises(SystemExit) as e:
+        main(["--project", str(project), "--metrics", str(tmp_path / "m.json")])
+    assert e.value.code == 2
+
+
+def test_cli_anim_and_poster_require_their_inputs(tmp_path):
+    input_file = tmp_path / "in.png"
+    save_image(input_file, np.full((32, 32), 0.4))
+
+    with pytest.raises(SystemExit):
+        main(["-i", str(input_file), "--anim", str(tmp_path / "a.gif")])
+    with pytest.raises(SystemExit):
+        main(["-i", str(input_file), "--poster", str(tmp_path / "p.svg")])
+
+
+def test_cli_project_mode_mismatch_is_an_error(tmp_path):
+    input_file = tmp_path / "in.png"
+    save_image(input_file, np.full((32, 32), 0.4))
+    bw_project = tmp_path / "bw.restring"
+    main(["-i", str(input_file), "--project-out", str(bw_project), "-d", "32"])
+
+    with pytest.raises(SystemExit):
+        main(["--project", str(bw_project), "--rgb", "-o", str(tmp_path / "o.png")])
+
+    rgb_project = tmp_path / "rgb.restring"
+    main(["-i", str(input_file), "--rgb", "--project-out", str(rgb_project), "-d", "32"])
+    with pytest.raises(SystemExit):
+        main(["--project", str(rgb_project), "-o", str(tmp_path / "o.png")])
+
+
+def test_cli_unknown_palette_is_a_clean_error(tmp_path):
+    input_file = tmp_path / "in.png"
+    save_image(input_file, np.full((32, 32), 0.4))
+
+    with pytest.raises(SystemExit) as e:
+        main(["-i", str(input_file), "--palette", "no-such-palette",
+              "-o", str(tmp_path / "o.png")])
+    assert e.value.code == 2
+
+
+def test_python_dash_m_entry_point(monkeypatch, capsys):
+    import runpy
+
+    # in-process module execution: argparse --help exits 0 after printing usage
+    monkeypatch.setattr("sys.argv", ["restring", "--help"])
+    with pytest.raises(SystemExit) as e:
+        runpy.run_module("restring", run_name="__main__")
+    assert e.value.code == 0
+    assert "Create string art" in capsys.readouterr().out
+
+    import subprocess
+    import sys
+
+    result = subprocess.run([sys.executable, "-m", "restring", "--help"],
+                            capture_output=True, text=True)
+    assert result.returncode == 0
+    assert "Create string art" in result.stdout
+
+
+def test_cli_metrics_with_layout_aspect_crops_the_target(tmp_path):
+    # a 64 x 32 input with rect@2.0: aspect != 1 drives the largest_rect path
+    input_file = tmp_path / "wide.png"
+    save_image(input_file, np.full((32, 64), 0.4))
+    metrics = tmp_path / "m.json"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "o.png"), "-d", "32",
+          "--layout", "rect@2.0", "--metrics", str(metrics), "-l", "40"])
+
+    report = json.loads(metrics.read_text())
+    assert report["mse"] >= 0.0
