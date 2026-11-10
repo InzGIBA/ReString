@@ -1,4 +1,4 @@
-"""Adaptive nail placement (prototype, research task T-14).
+"""Adaptive nail placement (prototype, measured and rejected as a default).
 
 Candidates sit evenly on the board perimeter; each candidate scores by the
 mean Sobel gradient magnitude within a fixed radius; a greedy pass picks the

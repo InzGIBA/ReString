@@ -1,6 +1,6 @@
 """Thread model experiment: how much quality does thread thickness buy?
 
-Pre-registered question (tasks/11-thread-thickness-render.md): at what
+Pre-registered question :: at what
 thread width does the thick-render MSE at N pulls match the hairline MSE at
 2N pulls? Everything renders at a fixed 1200 px export, physical board
 400 mm, thread widths 0.15 / 0.2 / 0.3 mm, both portrait fixtures, rectangle

@@ -7,7 +7,7 @@ cost. Working strength is swept {0.05, 0.1} so the verdict is about the grid,
 not a mistuned constant: at 600 a 1-px line darkens 4x fewer pixels relative
 to the canvas.
 
-Verdict rules pre-registered in tasks/05-working-grid-scale.md: keep 300 if
+Verdict rules pre-registered : : keep 300 if
 the gain stays under 3 percent MSE or the time grows past 3x; otherwise a
 `-g/--grid` flag lands.
 

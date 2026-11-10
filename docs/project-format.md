@@ -8,7 +8,7 @@ A `.restring` file stores everything needed to re-render a finished result witho
 {
   "format": "restring-project",
   "version": 1,
-  "created": "2027-04-01T12:00:00Z",
+  "created": "2026-11-11T12:00:00Z",
   "mode": "bw",
   "config": {
     "grid": 300, "wb": false, "nail_step": 4, "layout": "rect",

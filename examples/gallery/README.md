@@ -48,7 +48,7 @@ background starves (`--weight 3`):
 restring -i photo.png -o out.png --rect -l 2000 -s 0.05 --weight 3
 ```
 
-Column 6 — star board from a T-13 layout spec, run to exhaustion (1500
+Column 6: star board from a --layout star spec, run to exhaustion (1500
 requested, ~1000 distinct survive the pixel-grid dedupe):
 
 ```bash

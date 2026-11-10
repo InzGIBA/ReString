@@ -1,6 +1,6 @@
 """Adaptive nail placement experiment: gradient-scored vs uniform perimeters.
 
-Question (pre-registered in tasks/14-adaptive-nail-placement.md): does
+Question: does
 placing the same nail count where the Sobel gradient is dense beat uniform
 perimeters? Adopt (--adaptive, default off) only on a 3 percent or better
 global MSE or an 8 percent or better center MSE improvement at equal nail

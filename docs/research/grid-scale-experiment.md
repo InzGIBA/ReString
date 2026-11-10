@@ -4,7 +4,7 @@ Question: everything is tuned around a 300 x 300 working grid. Does searching ab
 
 Answer: keep 300. At the production working strength the gain from searching at 450 or 600 stays between 0.1 and 2.6 percent MSE, under the pre-registered 3 percent bar, at 1.5 to 2.4x the time. The flag does not ship and the 300 constant stands.
 
-Verdict rules were pre-registered in tasks/05-working-grid-scale.md: keep 300 if the gain stays under 3 percent MSE or the time grows past 3x.
+Verdict rules were pre-registered before the measurement: keep 300 if the gain stays under 3 percent MSE or the time grows past 3x.
 
 ## Setup
 

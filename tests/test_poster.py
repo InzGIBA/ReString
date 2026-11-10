@@ -20,7 +20,7 @@ def hand_built_project(mode="bw"):
     order = [0, 1, 2, 3, 4]
     orders = [order] if mode == "bw" else [order, order, order]
     return Project(mode=mode, config={"grid": 10, "wb": False}, nails=nails,
-                   pull_orders=orders, input_digest="sha256:t", created="2027-04-01T00:00:00Z",
+                   pull_orders=orders, input_digest="sha256:t", created="2026-04-01T00:00:00Z",
                    restring_version="1.3.0")
 
 
@@ -62,7 +62,7 @@ def test_svg_structure_and_footer():
     assert "Nails: 5" in footer and "Pulls: 4" in footer and "Threads: 1" in footer
     # 689.2 mm total rounds to whole meters on a real-size poster
     assert "thread length: 1 m" in footer
-    assert f"ReString {restring.__version__}" in texts[-1] and "2027-04-01" in texts[-1]
+    assert f"ReString {restring.__version__}" in texts[-1] and "2026-04-01" in texts[-1]
 
 
 def test_svg_numbering_order_matches_nail_list():

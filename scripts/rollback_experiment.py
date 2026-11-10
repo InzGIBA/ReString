@@ -1,6 +1,6 @@
 """Rollback experiment: what does truncating to the best prefix buy?
 
-Pre-registered expectation (tasks/15-best-prefix-rollback.md): small but
+Pre-registered expectation: small but
 consistent gains at high budgets, near-zero at 500. Budgets 2000 and 3000
 (3000 crosses rect saturation, so the stagnation exit fires), plus one
 run-to-exhaustion pass per fixture. Decision hook: 1 percent or better MSE

@@ -1,6 +1,6 @@
 # Thread thickness against the hairline
 
-Question (pre-registered in tasks/11-thread-thickness-render.md): at what thread width does the thick-render MSE at N pulls match the hairline MSE at 2N pulls? In other words, how much thread budget does a realistic thread width buy?
+Question : at what thread width does the thick-render MSE at N pulls match the hairline MSE at 2N pulls? In other words, how much thread budget does a realistic thread width buy?
 
 Answer: 0.3 mm on a 400 mm board (0.9 px at the 1200 px export) matches the hairline's double budget at N = 500, and at N = 2000 every tested width beats the hairline, the widest by 35 percent. Above the working grid, the hairline is an over-inked 1 px line; a thinner-than-1-px physical thread deposits a fraction of that ink and lands closer to the reference.
 

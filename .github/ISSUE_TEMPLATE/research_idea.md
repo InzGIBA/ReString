@@ -4,7 +4,7 @@ about: Propose a measurable experiment in the project's format
 labels: ["research"]
 ---
 
-The project's research culture: every quality claim gets a measurement with pre-registered success bars before any code ships. Frame your idea the same way and it can become a task like the ones in [tasks/](../blob/main/tasks/).
+The project's research culture: every quality claim gets a measurement with pre-registered success bars before any code ships. Frame your idea the same way and the measurements you cite set the example. The closed questions live in [docs/research/](../blob/main/docs/research/).
 
 **Question**
 

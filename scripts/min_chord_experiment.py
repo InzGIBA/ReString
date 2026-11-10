@@ -3,7 +3,7 @@
 Sweeps the --min-chord threshold on the face fixtures, rectangle nails at
 step 4, budgets 500 and 2000 threads. Metric per threshold: global render
 MSE, center MSE (central 50 percent box), run time and average chord length.
-Adoption rule (pre-registered in tasks/02-min-chord-distance.md): a default
+Adoption rule (pre-registered : ): a default
 ships only if a threshold improves global MSE by 3 percent or more at an
 equal budget; otherwise the flag ships with default off.
 

@@ -1,4 +1,4 @@
-"""Adaptive nail placement prototype (T-14): candidate pools and selection."""
+"""Adaptive nail placement prototype: candidate pools and selection."""
 
 import numpy as np
 import pytest

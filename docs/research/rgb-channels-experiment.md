@@ -4,7 +4,7 @@ Question: the RGB pipeline runs one greedy search per channel on a shared nail g
 
 Answer: one change is worth adopting. Halving the working strength from 0.1 to 0.05 improves global color MSE by 13 to 17 percent on both fixtures and raises grayscale SSIM by a quarter. The other three measurements are negative: variance-proportional budgets hurt badly, exhaustion stopping changes nothing, and the fixed 0.1 export loses to auto. The 0.05 working strength shipped; everything else stands.
 
-Verdict rules were pre-registered in tasks/04-rgb-channel-sweeps.md: adopt only on 5 percent or better global color MSE improvement on both fixtures.
+Verdict rules were pre-registered before the measurement: adopt only on 5 percent or better global color MSE improvement on both fixtures.
 
 ## Setup
 
@@ -53,7 +53,7 @@ Same orders, fixed 0.1 export against the auto 104/L law:
 | auto (baseline) | 0.0325 | 0.0424 |
 | fixed 0.1 | 0.0322 | 0.0385 |
 
-Fixed 0.1 wins by 0.9 percent on the male fixture and loses by 9.2 percent on the female. The mixed result fails the both-fixtures rule, and the auto law already ships as the default (T-03). Auto stands.
+Fixed 0.1 wins by 0.9 percent on the male fixture and loses by 9.2 percent on the female. The mixed result fails the both-fixtures rule, and the auto law already ships as the default. Auto stands.
 
 ![RGB channel sweep chart](../img/rgb_channel_sweep.png)
 
@@ -65,4 +65,4 @@ Fixed 0.1 wins by 0.9 percent on the male fixture and loses by 9.2 percent on th
 
 ## Recommendation
 
-Shipped: working strength 0.05 for the RGB pipeline (goldens: `tests/test_rust_core.py::test_rgb_orders_golden`). Standing: equal budgets, budgeted stopping, auto per-channel export. Per-channel working strengths (one value per channel) were not tested and remain open for the palette work in T-12.
+Shipped: working strength 0.05 for the RGB pipeline (goldens: `tests/test_rust_core.py::test_rgb_orders_golden`). Standing: equal budgets, budgeted stopping, auto per-channel export. Per-channel working strengths (one value per channel) were not tested and remain open for the palette work.

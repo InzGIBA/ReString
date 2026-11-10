@@ -1,6 +1,6 @@
 # Adaptive nail placement: gradient-scored against uniform perimeters
 
-Question (pre-registered in tasks/14-adaptive-nail-placement.md): a portrait's detail lives in the eyes and mouth while the forehead is flat. Does placing the same nail count where the Sobel gradient is dense beat uniform perimeters?
+Question : a portrait's detail lives in the eyes and mouth while the forehead is flat. Does placing the same nail count where the Sobel gradient is dense beat uniform perimeters?
 
 Answer: no, decisively. Adaptive placement loses to uniform on every tested combination: 24 facets across two fixtures, two layouts, three nail counts and two budgets. Global MSE never improves (best case +0.0 percent, worst case -12.4 percent) and center MSE degrades by 1.7 to 52.6 percent. The pre-registered bar (adopt on 3 percent global or 8 percent center gain on both fixtures) fails everywhere. No flag ships; the question closes.
 

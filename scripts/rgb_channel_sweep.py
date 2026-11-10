@@ -6,7 +6,7 @@ with the shortest channels padded by repeating their last nail. This script
 sweeps all four unknowns on the portrait fixtures and reports global color
 MSE, per-channel MSE, grayscale SSIM and the padded-pull share.
 
-Verdict rules are pre-registered in tasks/04-rgb-channel-sweeps.md: adopt a
+Verdict rules are pre-registered: adopt a
 pipeline change only on >=5 percent global color MSE improvement on both
 fixtures; record negative results with the same care.
 
@@ -37,7 +37,7 @@ PHOTOS = {
 BUDGET = 2000
 WORK_GRID = [0.03, 0.05, 0.1, 0.15]  # working strength, all channels; 0.1 = current default
 EXPORT_GRID = 0.1
-AUTO_K = 104.0  # T-03 fitted constant (scripts/fit_export_strength.py)
+AUTO_K = 104.0  # fitted constant (scripts/fit_export_strength.py)
 EXPORT_FLOOR, EXPORT_CEIL = 0.03, 0.2
 
 

@@ -1,6 +1,6 @@
 # Multi-start greedy: the last search-strategy measurement
 
-Question (pre-registered in tasks/17-multistart-research.md): multi-start (run the greedy from several starting states, keep the best run) is the only untested member of the search-strategy family. Does the best of S runs at budget B beat a single greedy run at the same total compute B x S?
+Question : multi-start (run the greedy from several starting states, keep the best run) is the only untested member of the search-strategy family. Does the best of S runs at budget B beat a single greedy run at the same total compute B x S?
 
 Answer: no, by the widest margin of the whole family. On both fixtures, every S in 2/4/8/16, both start axes (starting nail, subset seed) and all three budgets, the best multi-start run loses to the greedy compute control. The gain is at best exactly zero: starting-nail rotations produce bit-identical pull orders to the plain run, so multi-start by start diversity delivers precisely the single-run result while spending S times the compute. The verdict closes the family: no known search modification beats spending the same compute on more threads.
 

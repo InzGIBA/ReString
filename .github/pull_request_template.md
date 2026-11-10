@@ -4,7 +4,7 @@ Delete the sections that do not apply. Keep the change focused: one idea per PR.
 
 ## What and why
 
-What does this PR change, and what problem does it solve? Link the issue or task file (`tasks/NN-*.md`) if one exists.
+What does this PR change, and what problem does it solve? Link the issue if one exists.
 
 ## Evidence
 

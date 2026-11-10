@@ -4,7 +4,7 @@ Question: the RGB mode paints pure red, green and blue threads no shop sells. Wh
 
 Answer: CMYK wins. At an equal budget of 3000 total pulls it improves color MSE by 42 to 45 percent over RGB on both fixtures, CMY improves it by 37 to 40 percent, and both pass the pre-registered 5 percent bar for a recommended palette. The 20-thread DMC starter fails the bar: at 150 pulls per thread each thread starves.
 
-Verdict rules were pre-registered in tasks/12-thread-palette-system.md: a palette ships as recommended only on a 5 percent or better color MSE improvement over rgb at an equal budget, on both fixtures.
+Verdict rules were pre-registered before the measurement: a palette ships as recommended only on a 5 percent or better color MSE improvement over rgb at an equal budget, on both fixtures.
 
 ## Setup
 

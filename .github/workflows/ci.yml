@@ -1,5 +1,5 @@
 # Continuous integration: build the Rust core and run the full suite on three
-# operating systems. T-07 (release workflow) reuses these steps and adds wheel
+# operating systems. The release workflow reuses these steps and adds wheel
 # building and publishing on top.
 name: CI
 

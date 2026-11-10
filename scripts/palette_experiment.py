@@ -2,7 +2,7 @@
 
 Equal total pull budgets (3000 split across threads) on the portrait
 fixtures. Metrics: color MSE at the 600 px export, per-thread pull counts,
-search time. Pre-registered bar (tasks/12-thread-palette-system.md): a
+search time. Pre-registered bar: a
 palette ships as recommended only on a 5 percent or better color MSE
 improvement over rgb at an equal budget.
 

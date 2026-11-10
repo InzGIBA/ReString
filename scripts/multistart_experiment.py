@@ -1,6 +1,6 @@
 """Multi-start greedy experiment: start diversity against the same compute.
 
-Variations under test (pre-registered in tasks/17-multistart-research.md):
+Variations under test (pre-registered : ):
 S starting nails (nail-list rotations) and S subset seeds (`-r 100`, seeds
 42 upward), each run at budget B, best run kept; controls at matched total
 compute (greedy with B*S pulls) and at B. Verdict rule: adopt nothing unless

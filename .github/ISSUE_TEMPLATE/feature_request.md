@@ -14,7 +14,7 @@ What should change, concretely? A CLI flag, an API call, a doc page?
 
 **Is this a closed dead end?**
 
-- [ ] I checked [docs/research/](../blob/main/docs/research/) and the dead-end table in [tasks/README.md](../blob/main/tasks/README.md) — this request is not one of the measured-and-rejected ideas (beam search, receding horizon, multi-scale, asymmetric penalties, add/remove local search, multi-start, adaptive placement, best-prefix rollback, minimum chord distance).
+- [ ] I checked [docs/research/](../blob/main/docs/research/) and this request is not one of the measured-and-rejected ideas (beam search, receding horizon, multi-scale, asymmetric penalties, add/remove local search, multi-start, adaptive placement, best-prefix rollback, minimum chord distance).
 
 Ideas from that list need new evidence, not persistence: re-open one with a new hypothesis and a pre-registered measurement, or expect the maintainers to ask for one.
 

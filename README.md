@@ -207,7 +207,7 @@ CI runs the same checks on every push to main and every pull request, on linux, 
 
 ## Roadmap
 
-The 2027 backlog lives in [tasks/](tasks/README.md): 20 self-contained work orders with acceptance criteria, and the dead-end table of ideas measured and closed. Answered in 2.0:
+Open experiment ideas arrive through the research-idea issue template: each states a question, a hypothesis and a pre-registered success bar. Closed questions live next to their measurements in [docs/research/](docs/research/), so nobody re-litigates them. Answered so far:
 
 - [x] Re-run the RGB sweeps: working strength 0.05 adopted, 13 to 17 percent better MSE ([measurement](docs/research/rgb-channels-experiment.md)).
 - [x] Test the working grid above 300 px: keep 300, under 3 percent MSE at up to 2.4x time ([measurement](docs/research/grid-scale-experiment.md)).

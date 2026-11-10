@@ -57,4 +57,4 @@ The pre-registered rule in the task file: adopt a default only if a threshold im
 
 ## Recommendation
 
-Keep the flag off by default. Do not add a `MIN_LOOP`-style recent-nail memory. The greedy already avoids revisiting the neighborhood, so the memory has nothing to fix. Revisit only for sparse custom layouts (T-13) where dead ends become common.
+Keep the flag off by default. Do not add a `MIN_LOOP`-style recent-nail memory. The greedy already avoids revisiting the neighborhood, so the memory has nothing to fix. Revisit only for sparse custom layouts where dead ends become common.
