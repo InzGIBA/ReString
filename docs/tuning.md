@@ -61,7 +61,9 @@ The subset is drawn in the Rust core with a seeded splitmix64 sampler, so runs r
 
 ![Export resolution](img/params/dims.png)
 
-MSE bottoms out exactly at the working grid, 300. Below 300 you lose detail. Above 300 the same thread pattern stretches over more pixels, the anti-aliased lines thin out and brighten, and error grows to 0.09 or worse. For large prints raise the working grid constant `LONG_SIDE` in `cli.py` instead of `-d`.
+MSE bottoms out exactly at the working grid, 300. Below 300 you lose detail. Above 300 the same thread pattern stretches over more pixels, the anti-aliased lines thin out and brighten, and error grows to 0.09 or worse. Keep `-d` at the working grid.
+
+Searching above the working grid was measured too: 450 and 600 buy 0.1 to 2.6 percent MSE at up to 2.4x the time at the production working strength 0.05, under the pre-registered 3 percent bar (see [research/grid-scale-experiment.md](research/grid-scale-experiment.md)). `LONG_SIDE = 300` stands. Large grids only help when the working strength is mistuned and channels saturate early.
 
 ## Saturation
 
@@ -113,4 +115,4 @@ The RGB pipeline inherits the layout, nail step and budget findings mechanically
 
 ## Limits
 
-The working grid above 300 was not tested. That remains an open experiment.
+The working grid above 300 is answered: keep 300 (research/grid-scale-experiment.md). Remaining open experiment: none tracked in the tuning guide.

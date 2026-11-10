@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | finer detail for large boards; informs physical-size presets |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (970c295) |
 
 ## Why
 

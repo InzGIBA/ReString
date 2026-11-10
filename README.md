@@ -168,7 +168,7 @@ uv run python scripts/benchmark.py --label before   # or after, then --plot
 ## Roadmap
 
 - [x] Re-run the RGB sweeps — working strength 0.05 adopted, 13 to 17 percent better MSE ([measurement](docs/research/rgb-channels-experiment.md)).
-- [ ] Test the working grid above 300 px.
+- [x] Test the working grid above 300 px — keep 300: under 3 percent MSE at up to 2.4x time ([measurement](docs/research/grid-scale-experiment.md)).
 
 ## Contributing
 

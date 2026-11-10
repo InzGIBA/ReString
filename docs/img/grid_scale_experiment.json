@@ -1,0 +1,270 @@
+{
+ "male": [
+  {
+   "grid": 300,
+   "work": 0.05,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.064,
+   "search_s": 0.078,
+   "threads": 500,
+   "mse": 0.2422,
+   "ssim": 0.518
+  },
+  {
+   "grid": 300,
+   "work": 0.05,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.064,
+   "search_s": 0.375,
+   "threads": 2000,
+   "mse": 0.1781,
+   "ssim": 0.3093
+  },
+  {
+   "grid": 300,
+   "work": 0.1,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.04,
+   "search_s": 0.093,
+   "threads": 500,
+   "mse": 0.2431,
+   "ssim": 0.5046
+  },
+  {
+   "grid": 300,
+   "work": 0.1,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.04,
+   "search_s": 0.438,
+   "threads": 1349,
+   "mse": 0.2098,
+   "ssim": 0.3509
+  },
+  {
+   "grid": 450,
+   "work": 0.05,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.097,
+   "search_s": 0.15,
+   "threads": 500,
+   "mse": 0.2419,
+   "ssim": 0.5233
+  },
+  {
+   "grid": 450,
+   "work": 0.05,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.097,
+   "search_s": 0.627,
+   "threads": 2000,
+   "mse": 0.1744,
+   "ssim": 0.3422
+  },
+  {
+   "grid": 450,
+   "work": 0.1,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.091,
+   "search_s": 0.162,
+   "threads": 500,
+   "mse": 0.2425,
+   "ssim": 0.515
+  },
+  {
+   "grid": 450,
+   "work": 0.1,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.091,
+   "search_s": 0.574,
+   "threads": 2000,
+   "mse": 0.1837,
+   "ssim": 0.301
+  },
+  {
+   "grid": 600,
+   "work": 0.05,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.089,
+   "search_s": 0.207,
+   "threads": 500,
+   "mse": 0.2417,
+   "ssim": 0.5263
+  },
+  {
+   "grid": 600,
+   "work": 0.05,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.089,
+   "search_s": 0.78,
+   "threads": 2000,
+   "mse": 0.1735,
+   "ssim": 0.3532
+  },
+  {
+   "grid": 600,
+   "work": 0.1,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.09,
+   "search_s": 0.211,
+   "threads": 500,
+   "mse": 0.2422,
+   "ssim": 0.52
+  },
+  {
+   "grid": 600,
+   "work": 0.1,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.09,
+   "search_s": 0.811,
+   "threads": 2000,
+   "mse": 0.1777,
+   "ssim": 0.3189
+  }
+ ],
+ "female": [
+  {
+   "grid": 300,
+   "work": 0.05,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.033,
+   "search_s": 0.087,
+   "threads": 500,
+   "mse": 0.2418,
+   "ssim": 0.5324
+  },
+  {
+   "grid": 300,
+   "work": 0.05,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.033,
+   "search_s": 0.407,
+   "threads": 2000,
+   "mse": 0.1777,
+   "ssim": 0.336
+  },
+  {
+   "grid": 300,
+   "work": 0.1,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.028,
+   "search_s": 0.094,
+   "threads": 500,
+   "mse": 0.2429,
+   "ssim": 0.5134
+  },
+  {
+   "grid": 300,
+   "work": 0.1,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.028,
+   "search_s": 0.359,
+   "threads": 1252,
+   "mse": 0.2111,
+   "ssim": 0.3851
+  },
+  {
+   "grid": 450,
+   "work": 0.05,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.049,
+   "search_s": 0.149,
+   "threads": 500,
+   "mse": 0.2412,
+   "ssim": 0.5513
+  },
+  {
+   "grid": 450,
+   "work": 0.05,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.049,
+   "search_s": 0.606,
+   "threads": 2000,
+   "mse": 0.1749,
+   "ssim": 0.3625
+  },
+  {
+   "grid": 450,
+   "work": 0.1,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.047,
+   "search_s": 0.159,
+   "threads": 500,
+   "mse": 0.2422,
+   "ssim": 0.5228
+  },
+  {
+   "grid": 450,
+   "work": 0.1,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.047,
+   "search_s": 0.603,
+   "threads": 1886,
+   "mse": 0.1848,
+   "ssim": 0.3361
+  },
+  {
+   "grid": 600,
+   "work": 0.05,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.078,
+   "search_s": 0.208,
+   "threads": 500,
+   "mse": 0.241,
+   "ssim": 0.5643
+  },
+  {
+   "grid": 600,
+   "work": 0.05,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.078,
+   "search_s": 0.766,
+   "threads": 2000,
+   "mse": 0.1737,
+   "ssim": 0.3762
+  },
+  {
+   "grid": 600,
+   "work": 0.1,
+   "budget": 500,
+   "nails": 300,
+   "cache_s": 0.086,
+   "search_s": 0.2,
+   "threads": 500,
+   "mse": 0.2416,
+   "ssim": 0.5372
+  },
+  {
+   "grid": 600,
+   "work": 0.1,
+   "budget": 2000,
+   "nails": 300,
+   "cache_s": 0.086,
+   "search_s": 0.778,
+   "threads": 2000,
+   "mse": 0.1774,
+   "ssim": 0.3462
+  }
+ ]
+}
