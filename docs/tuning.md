@@ -37,7 +37,7 @@ Physical pieces in the 3000 to 7000 thread range need `-s 0.05`. See [research/p
 
 ![Rectangle against circle](img/params/layout.png)
 
-Rectangle nails cut error by 1.8 to 2.7x on square portraits: MSE 0.029 against 0.078 on the male fixture, 0.030 against 0.054 on the female fixture, both at 2000 iterations. Corner nails cover the edges of the face and hair. Use the circle only for round physical frames.
+Rectangle nails cut error by 1.8 to 2.7x on square portraits: MSE 0.029 against 0.078 on the male fixture, 0.030 against 0.054 on the female fixture, both at 2000 iterations. Corner nails cover the edges of the face and hair. Use the circle only for round physical frames. Custom layouts (`--layout polygon:5`, `star:5:0.55`, `rings:...`, `svg:...`) are geometry plugins: the search and the saturation findings transfer unchanged, and the nail-count guidance below applies per layout (docs/layouts.md).
 
 ## Nail step
 

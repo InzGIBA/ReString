@@ -3,11 +3,12 @@ import hashlib
 import logging
 from pathlib import Path
 
-from restring import _core, palettes
+from restring import _core, layouts, palettes
 from restring.animation import animate_project
 from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_array_rgb
 from restring.generator import Config, generate_bw, generate_palette, resolve_export_strength
-from restring.image_transformations import largest_square, resize
+from restring.image_transformations import largest_rect, largest_square, resize
+from restring.layouts import LayoutError
 from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
 from restring.poster import poster_svg, thread_lengths_mm
 from restring.project import load as load_project
@@ -44,6 +45,11 @@ def build_parser():
                         help="thread palette: built-in name (rgb, cmy, cmyk) or a JSON "
                              "palette file path")
     parser.add_argument('--rect', action="store_true")
+    parser.add_argument('--layout', action="store", dest="layout", default=None,
+                        help="nail layout spec: circle | rect | polygon:sides[:count] | "
+                             "star:points:inner[:count] | rings:r:count,r:count | "
+                             "svg:file.svg[:count], with an optional @aspect suffix "
+                             "(e.g. polygon:5@1.5) for non-square boards")
     parser.add_argument('--realistic', action="store_true")
     parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size",
                         default=None,
@@ -92,6 +98,79 @@ def render_project(proj, args):
 
     logger.info(f"Re-render from project: {pulls} pulls, no search")
     result.save_png(args.output_file)
+
+
+def resolve_layout(spec, parser, nail_step):
+    """Parse a --layout spec into (builder(shape) -> nails, label, aspect).
+    Grammar: circle | rect | polygon:sides[:count] | star:points:inner[:count]
+    | rings:r:count,r:count | svg:file.svg[:count], optional @aspect suffix.
+    circle and rect keep the -n density dial; the other layouts take explicit
+    counts (default 300)."""
+    aspect = 1.0
+    if "@" in spec:
+        spec, aspect_text = spec.rsplit("@", 1)
+        try:
+            aspect = float(aspect_text)
+        except ValueError:
+            parser.error(f"--layout aspect must be a number, got {aspect_text!r}")
+        if not 0.1 <= aspect <= 10.0:
+            parser.error(f"--layout aspect must sit in 0.1..10, got {aspect}")
+
+    parts = spec.split(":")
+    name = parts[0]
+    default_count = 300
+
+    def as_int(text, what, minimum):
+        try:
+            value = int(text)
+        except ValueError:
+            parser.error(f"--layout {what} must be an int, got {text!r}")
+        if value < minimum:
+            parser.error(f"--layout {what} must be >= {minimum}, got {value}")
+        return value
+
+    def as_float(text, what):
+        try:
+            return float(text)
+        except ValueError:
+            parser.error(f"--layout {what} must be a number, got {text!r}")
+
+    def build(shape):
+        if name in ("circle", "rect"):
+            if name == "rect":
+                return create_rectangle_nail_positions(shape, nail_step)
+            return create_circle_nail_positions(shape, nail_step)
+        if name == "polygon":
+            sides = as_int(parts[1], "polygon sides", 3) if len(parts) > 1 else 5
+            count = as_int(parts[2], "polygon count", 3) if len(parts) > 2 else default_count
+            return layouts.polygon(shape, sides, count)
+        if name == "star":
+            if len(parts) < 3:
+                parser.error("--layout star needs star:points:inner[:count]")
+            spikes = as_int(parts[1], "star points", 3)
+            inner = as_float(parts[2], "star inner radius")
+            count = as_int(parts[3], "star count", 3) if len(parts) > 3 else default_count
+            return layouts.star(shape, spikes, inner, count)
+        if name == "rings":
+            values = ":".join(parts[1:]).replace(",", ":").split(":")
+            if len(values) < 2 or len(values) % 2:
+                parser.error("--layout rings needs rings:r:count,r:count (pairs of radius, count)")
+            specs = []
+            for i in range(0, len(values), 2):
+                specs.append((as_float(values[i], "ring radius"),
+                              as_int(values[i + 1], "ring count", 3)))
+            return layouts.rings(shape, specs)
+        if name == "svg":
+            if len(parts) < 2:
+                parser.error("--layout svg needs svg:file.svg[:count]")
+            path = ":".join(parts[1:-1]) if len(parts) > 2 else parts[1]
+            count = as_int(parts[-1], "svg count", 3) if len(parts) > 2 else default_count
+            if not Path(path).exists():
+                parser.error(f"--layout svg file not found: {path}")
+            return layouts.from_svg(path, shape, count)
+        parser.error(f"unknown layout {name!r}; see --help")
+
+    return aspect, build
 
 
 def main(argv=None):
@@ -143,18 +222,26 @@ def main(argv=None):
 
     img = _core.Image.load(args.input_file)
 
-    if args.radius1_multiplier == 1 and args.radius2_multiplier == 1:
+    if args.layout and args.rect:
+        parser.error("--rect and --layout are mutually exclusive")
+    aspect, build = resolve_layout(args.layout or ("rect" if args.rect else "circle"),
+                                   parser, args.nail_step)
+
+    if args.radius1_multiplier == 1 and args.radius2_multiplier == 1 and aspect == 1.0:
         img = resize(largest_square(img), (LONG_SIDE, LONG_SIDE))
+    elif aspect != 1.0:
+        img = resize(largest_rect(img, aspect),
+                     (LONG_SIDE, int(round(LONG_SIDE * aspect))))
 
     h, w, _ = img.shape()
     shape = (h, w)
 
-    if args.rect:
-        nails = create_rectangle_nail_positions(shape, args.nail_step)
-    else:
-        nails = create_circle_nail_positions(shape, args.nail_step,
-                                             args.radius1_multiplier, args.radius2_multiplier)
+    try:
+        nails = build(shape)
+    except (LayoutError, ValueError) as exc:
+        parser.error(f"bad --layout: {exc}")
 
+    layout_label = args.layout or ("rect" if args.rect else "circle")
     logger.info(f"Nails amount: {len(nails)}")
 
     threads = None
@@ -187,7 +274,7 @@ def main(argv=None):
                 "grid": h if h == w else [h, w],
                 "wb": args.wb,
                 "nail_step": args.nail_step,
-                "layout": "rect" if args.rect else "circle",
+                "layout": layout_label,
                 "pull_budget": args.pull_amount,
                 "weight": args.weight_peak,
                 "min_chord": args.min_chord,

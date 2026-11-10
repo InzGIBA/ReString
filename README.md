@@ -40,6 +40,7 @@ The project started as a 2020 university course assignment by Kaspar Valk, Kert 
 
 - **One uncut thread** — the pull order is continuous by construction, so you wind a single thread by hand or machine.
 - **Two layouts, three palettes** — nails on a circle or a rectangle border; black-on-white, white-on-black, or RGB with three interleaved threads.
+- **Custom boards** — polygon, star, multi-ring and SVG-outline layouts via `--layout star:5:0.55`, plus non-square aspect crops ([layouts guide](docs/layouts.md)).
 - **Measured, not guessed** — every flag has a degradation curve behind it in the [tuning guide](docs/tuning.md).
 
 ## Quick start
@@ -90,7 +91,8 @@ restring -i portrait.png -o out.png --rect -n 2 -l 3000
 | `-i <path>` | input image (PNG or JPEG) | required |
 | `-o <path>` | output PNG | `output.png` |
 | `-d <int>` | output side length in pixels | 300 |
-| `-n <int>` | nail step. Smaller values place more nails. Minimum 1 | 4 |
+| `-n <int>` | nail step for the circle and rect layouts. Smaller values place more nails. Minimum 1 | 4 |
+| `--layout <spec>` | nail layout: `circle`, `rect`, `polygon:sides[:count]`, `star:points:inner[:count]`, `rings:r:count,r:count`, `svg:file.svg[:count]`, optional `@aspect` suffix for non-square boards. Custom layouts take counts instead of `-n` | circle |
 | `-l <int>` | iteration budget. Without the flag the search stops after 3 pulls with no improvement | run to exhaustion |
 | `-s <float>` | thread strength at export, 0..1. Leave unset and the run derives the value from the actual pull count: k/L with k=104, clamped to 0.03..0.2, within 2 percent of the hand-tuned optimum at the measured budgets | auto |
 | `-r <int>` | scan a fixed random subset of candidates each iteration. Trades quality for speed. Good values sit near 100 to 150 | all nails |

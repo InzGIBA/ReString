@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | T-14 (adaptive placement composes with these); non-square art |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (d10f7e2) |
 
 ## Why
 

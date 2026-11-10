@@ -215,6 +215,55 @@ def test_cli_rgb_wins_over_palette(tmp_path, caplog):
     assert any("ignoring --palette" in r.message for r in caplog.records)
 
 
+def test_cli_layout_specs(tmp_path):
+    from pathlib import Path
+
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    for spec in ("polygon:5:80", "star:5:0.55:80", "rings:1.0:60,0.6:40"):
+        main(["-i", str(input_file), "-o", str(tmp_path / f"{spec.replace(':', '_')}.png"),
+              "-d", "40", "-l", "40", "--layout", spec])
+        assert (tmp_path / f"{spec.replace(':', '_')}.png").exists()
+
+    star_svg = Path(__file__).parent / "data" / "star_outline.svg"
+    main(["-i", str(input_file), "-o", str(tmp_path / "svg.png"), "-d", "40", "-l", "40",
+          "--layout", f"svg:{star_svg}:80"])
+    assert (tmp_path / "svg.png").exists()
+
+
+def test_cli_layout_grammar_errors(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    for spec in ("star:2", "polygon:2", "rings:1.4:50", "hexagon:6"):
+        with pytest.raises(SystemExit):
+            main(["-i", str(input_file), "-o", str(tmp_path / "bad.png"), "-d", "40",
+                  "-l", "20", "--layout", spec])
+
+
+def test_cli_layout_rect_conflict(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    with pytest.raises(SystemExit):
+        main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "20",
+              "--rect", "--layout", "polygon:5"])
+
+
+def test_cli_layout_aspect_crop(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 80, 3)))  # wide source
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "wide.png"), "-d", "40",
+          "-l", "30", "--layout", "polygon:5:80@2.0"])
+    assert (tmp_path / "wide.png").exists()
+
+
 def test_cli_palette_project_out_rejected(tmp_path):
     rng = np.random.default_rng(2)
     input_file = tmp_path / "in.png"
