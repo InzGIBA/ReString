@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | closure of the search-strategy question for good |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (48ffcd4) |
 
 ## Why
 

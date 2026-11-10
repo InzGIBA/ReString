@@ -621,7 +621,7 @@ fn log_info(py: Python<'_>, msg: &str) {
 /// docs/optimization.md (stage 7): with canvas-crossing chords the per-line
 /// invalidation fan-out rivals the full rescan cost, so the cache measured
 /// 0.4-0.6x of the plain scan throughput.
-#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, weights=None, min_chord=None, rollback=false))]
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, weights=None, min_chord=None, rollback=false, seed=None))]
 fn create_art(
     py: Python<'_>,
     nails: Vec<(i64, i64)>,
@@ -633,6 +633,7 @@ fn create_art(
     weights: Option<&Image>,
     min_chord: Option<f64>,
     rollback: bool,
+    seed: Option<u64>,
 ) -> PyResult<(Vec<u64>, Image)> {
     if orig.ch != 1 {
         return Err(PyValueError::new_err("create_art needs a grayscale target"));
@@ -653,7 +654,7 @@ fn create_art(
 
     let order: Vec<usize> = match random_nails {
         None => (0..n).collect(),
-        Some(k) => seeded_subset(n, k as usize, 42),
+        Some(k) => seeded_subset(n, k as usize, seed.unwrap_or(42)),
     };
 
     // parallel rasterization across sources

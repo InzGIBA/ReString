@@ -1,0 +1,378 @@
+{
+ "male": [
+  {
+   "config": "greedy_500",
+   "compute": 500,
+   "mse": 0.1703,
+   "time_s": 0.15
+  },
+  {
+   "config": "greedy_1000",
+   "compute": 1000,
+   "mse": 0.1009,
+   "time_s": 0.24
+  },
+  {
+   "config": "greedy_2000",
+   "compute": 2000,
+   "mse": 0.0291,
+   "time_s": 0.45
+  },
+  {
+   "config": "greedy_4000",
+   "compute": 4000,
+   "mse": 0.0185,
+   "time_s": 0.83
+  },
+  {
+   "config": "greedy_8000",
+   "compute": 8000,
+   "mse": 0.0185,
+   "time_s": 1.52
+  },
+  {
+   "config": "starts2_B500",
+   "compute": 1000,
+   "mse": 0.1703,
+   "time_s": 0.29
+  },
+  {
+   "config": "seeds2_B500",
+   "compute": 1000,
+   "mse": 0.1751,
+   "time_s": 0.18
+  },
+  {
+   "config": "starts4_B500",
+   "compute": 2000,
+   "mse": 0.1703,
+   "time_s": 0.59
+  },
+  {
+   "config": "seeds4_B500",
+   "compute": 2000,
+   "mse": 0.1744,
+   "time_s": 0.37
+  },
+  {
+   "config": "starts8_B500",
+   "compute": 4000,
+   "mse": 0.1703,
+   "time_s": 1.19
+  },
+  {
+   "config": "seeds8_B500",
+   "compute": 4000,
+   "mse": 0.1736,
+   "time_s": 0.75
+  },
+  {
+   "config": "starts16_B500",
+   "compute": 8000,
+   "mse": 0.1703,
+   "time_s": 2.33
+  },
+  {
+   "config": "seeds16_B500",
+   "compute": 8000,
+   "mse": 0.1735,
+   "time_s": 1.51
+  },
+  {
+   "config": "greedy_16000",
+   "compute": 16000,
+   "mse": 0.0185,
+   "time_s": 2.88
+  },
+  {
+   "config": "starts2_B1000",
+   "compute": 2000,
+   "mse": 0.1009,
+   "time_s": 0.51
+  },
+  {
+   "config": "seeds2_B1000",
+   "compute": 2000,
+   "mse": 0.112,
+   "time_s": 0.3
+  },
+  {
+   "config": "starts4_B1000",
+   "compute": 4000,
+   "mse": 0.1009,
+   "time_s": 1.06
+  },
+  {
+   "config": "seeds4_B1000",
+   "compute": 4000,
+   "mse": 0.1106,
+   "time_s": 0.59
+  },
+  {
+   "config": "starts8_B1000",
+   "compute": 8000,
+   "mse": 0.1009,
+   "time_s": 1.99
+  },
+  {
+   "config": "seeds8_B1000",
+   "compute": 8000,
+   "mse": 0.1095,
+   "time_s": 1.13
+  },
+  {
+   "config": "starts16_B1000",
+   "compute": 16000,
+   "mse": 0.1009,
+   "time_s": 4.16
+  },
+  {
+   "config": "seeds16_B1000",
+   "compute": 16000,
+   "mse": 0.1087,
+   "time_s": 2.3
+  },
+  {
+   "config": "greedy_32000",
+   "compute": 32000,
+   "mse": 0.0185,
+   "time_s": 5.84
+  },
+  {
+   "config": "starts2_B2000",
+   "compute": 4000,
+   "mse": 0.0291,
+   "time_s": 0.96
+  },
+  {
+   "config": "seeds2_B2000",
+   "compute": 4000,
+   "mse": 0.051,
+   "time_s": 0.49
+  },
+  {
+   "config": "starts4_B2000",
+   "compute": 8000,
+   "mse": 0.0291,
+   "time_s": 1.88
+  },
+  {
+   "config": "seeds4_B2000",
+   "compute": 8000,
+   "mse": 0.0491,
+   "time_s": 0.96
+  },
+  {
+   "config": "starts8_B2000",
+   "compute": 16000,
+   "mse": 0.0291,
+   "time_s": 3.7
+  },
+  {
+   "config": "seeds8_B2000",
+   "compute": 16000,
+   "mse": 0.048,
+   "time_s": 1.97
+  },
+  {
+   "config": "starts16_B2000",
+   "compute": 32000,
+   "mse": 0.0291,
+   "time_s": 7.71
+  },
+  {
+   "config": "seeds16_B2000",
+   "compute": 32000,
+   "mse": 0.0462,
+   "time_s": 3.9
+  }
+ ],
+ "female": [
+  {
+   "config": "greedy_500",
+   "compute": 500,
+   "mse": 0.1701,
+   "time_s": 0.15
+  },
+  {
+   "config": "greedy_1000",
+   "compute": 1000,
+   "mse": 0.1015,
+   "time_s": 0.25
+  },
+  {
+   "config": "greedy_2000",
+   "compute": 2000,
+   "mse": 0.0303,
+   "time_s": 0.45
+  },
+  {
+   "config": "greedy_4000",
+   "compute": 4000,
+   "mse": 0.022,
+   "time_s": 0.82
+  },
+  {
+   "config": "greedy_8000",
+   "compute": 8000,
+   "mse": 0.022,
+   "time_s": 1.77
+  },
+  {
+   "config": "starts2_B500",
+   "compute": 1000,
+   "mse": 0.1701,
+   "time_s": 0.3
+  },
+  {
+   "config": "seeds2_B500",
+   "compute": 1000,
+   "mse": 0.1752,
+   "time_s": 0.22
+  },
+  {
+   "config": "starts4_B500",
+   "compute": 2000,
+   "mse": 0.17,
+   "time_s": 0.63
+  },
+  {
+   "config": "seeds4_B500",
+   "compute": 2000,
+   "mse": 0.1752,
+   "time_s": 0.38
+  },
+  {
+   "config": "starts8_B500",
+   "compute": 4000,
+   "mse": 0.17,
+   "time_s": 1.18
+  },
+  {
+   "config": "seeds8_B500",
+   "compute": 4000,
+   "mse": 0.175,
+   "time_s": 0.75
+  },
+  {
+   "config": "starts16_B500",
+   "compute": 8000,
+   "mse": 0.17,
+   "time_s": 2.46
+  },
+  {
+   "config": "seeds16_B500",
+   "compute": 8000,
+   "mse": 0.1746,
+   "time_s": 1.56
+  },
+  {
+   "config": "greedy_16000",
+   "compute": 16000,
+   "mse": 0.022,
+   "time_s": 3.3
+  },
+  {
+   "config": "starts2_B1000",
+   "compute": 2000,
+   "mse": 0.1015,
+   "time_s": 0.5
+  },
+  {
+   "config": "seeds2_B1000",
+   "compute": 2000,
+   "mse": 0.1124,
+   "time_s": 0.29
+  },
+  {
+   "config": "starts4_B1000",
+   "compute": 4000,
+   "mse": 0.1015,
+   "time_s": 1.04
+  },
+  {
+   "config": "seeds4_B1000",
+   "compute": 4000,
+   "mse": 0.1124,
+   "time_s": 0.59
+  },
+  {
+   "config": "starts8_B1000",
+   "compute": 8000,
+   "mse": 0.1015,
+   "time_s": 2.13
+  },
+  {
+   "config": "seeds8_B1000",
+   "compute": 8000,
+   "mse": 0.1124,
+   "time_s": 1.18
+  },
+  {
+   "config": "starts16_B1000",
+   "compute": 16000,
+   "mse": 0.1015,
+   "time_s": 4.23
+  },
+  {
+   "config": "seeds16_B1000",
+   "compute": 16000,
+   "mse": 0.1112,
+   "time_s": 2.41
+  },
+  {
+   "config": "greedy_32000",
+   "compute": 32000,
+   "mse": 0.022,
+   "time_s": 6.01
+  },
+  {
+   "config": "starts2_B2000",
+   "compute": 4000,
+   "mse": 0.0303,
+   "time_s": 0.93
+  },
+  {
+   "config": "seeds2_B2000",
+   "compute": 4000,
+   "mse": 0.0517,
+   "time_s": 0.5
+  },
+  {
+   "config": "starts4_B2000",
+   "compute": 8000,
+   "mse": 0.0303,
+   "time_s": 1.86
+  },
+  {
+   "config": "seeds4_B2000",
+   "compute": 8000,
+   "mse": 0.0517,
+   "time_s": 0.97
+  },
+  {
+   "config": "starts8_B2000",
+   "compute": 16000,
+   "mse": 0.0303,
+   "time_s": 3.81
+  },
+  {
+   "config": "seeds8_B2000",
+   "compute": 16000,
+   "mse": 0.0517,
+   "time_s": 2.01
+  },
+  {
+   "config": "starts16_B2000",
+   "compute": 32000,
+   "mse": 0.0303,
+   "time_s": 7.46
+  },
+  {
+   "config": "seeds16_B2000",
+   "compute": 32000,
+   "mse": 0.0494,
+   "time_s": 4.09
+  }
+ ]
+}
