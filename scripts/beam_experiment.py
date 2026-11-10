@@ -73,7 +73,6 @@ def main():
             print(f"{tag} {label}: {row['time_s']:.1f}s, {row['threads']} threads")
 
         # greedy controls at bigger budgets for the time-matched comparison
-        greedy_ms = next(r["time_s"] for r in rows if r["config"] == "greedy_500") * 1000
         controls = []
         for budget in (1000, 2000):
             row = run(f"greedy_{budget}", lambda b=budget: _core.create_art(nails, target, STRENGTH, b, None, True))
