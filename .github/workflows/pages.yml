@@ -1,0 +1,47 @@
+# Playground deployment: build the wasm module and publish web/ to GitHub
+# Pages on every push to main. The wasm step needs the wasm32 target and
+# wasm-pack (see web/README.md for the local recipe).
+name: Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+      - name: Build the wasm module
+        run: wasm-pack build rust/wasm --target web --out-dir ../../web/pkg
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

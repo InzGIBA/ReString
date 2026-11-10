@@ -33,3 +33,7 @@ output-color.png
 
 # maturin build artifact
 src/restring/_core.abi3.so
+rust/target/
+rust/core/target/
+rust/wasm/target/
+web/pkg/

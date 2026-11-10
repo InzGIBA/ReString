@@ -28,7 +28,7 @@ def timed(fn):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--label", choices=["before", "after"], default=None)
+    parser.add_argument("--label", choices=["before", "after", "split"], default=None)
     parser.add_argument("--plot", action="store_true")
     args = parser.parse_args()
 

@@ -10,6 +10,8 @@ Feed in a portrait. The greedy search picks one thread at a time — each pull i
 
 [Quick start](#quick-start) · [Usage](#usage) · [Tuning](#tuning) · [Development](#development) · [Contributing](#contributing) · [License](#license)
 
+Try it in the browser: the [playground](https://inzgiba.github.io/ReString/) runs the same core as a wasm module — drop a photo, no install. The page deploys from `web/` (`.github/workflows/pages.yml`).
+
 ## Overview
 
 - **For:** makers winding physical boards, machine and plotter owners, and anyone who wants a digital string-art render.

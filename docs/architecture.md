@@ -77,6 +77,15 @@ Two optimizations were measured and declined:
 - SIMD and FMA. The scan loop reads pixels through a gather pattern, which blocks auto-vectorization. FMA instructions change float rounding, which would drift the frozen golden orders.
 - Incremental improvement cache. Cache candidate improvements and invalidate the lines crossing each applied pull. The idea preserved results exactly, but the benchmark showed 0.4x to 0.6x throughput. Canvas-crossing chords give each changed pixel a fan-out of roughly 73 lines, so invalidation cost rivalled the full rescan. Reverted.
 
+## Targets
+
+One core crate, two bindings. `rust/core/` holds the platform-neutral algorithms as plain Rust: image container, Zingl rasterizer, line cache, greedy search, renderers, animation frames, metrics. Two thin bindings wrap it:
+
+- CPython via pyo3 (`rust/`, the maturin crate): exposes `restring._core`, the module every Python test and script imports. The line cache builds with `std::thread::scope` here.
+- Web via wasm-bindgen (`rust/wasm/`, target `web`): `load_image`, `generate`, `render_png` for the browser playground (`web/`). Threads are unavailable on wasm32-unknown-unknown, so the cache builder has a serial fallback behind `cfg`.
+
+Behavior is shared by construction: both bindings call the same functions, and the golden tests plus `scripts/benchmark.py --label split` pin the split as behavior-preserving. The playground builds with `wasm-pack build rust/wasm --target web` and deploys `web/` to GitHub Pages (`.github/workflows/pages.yml`).
+
 ## Build
 
 Requirements: uv, a Rust toolchain, and a C linker for cargo. Standard setups work out of the box:

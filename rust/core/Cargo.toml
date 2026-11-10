@@ -1,0 +1,12 @@
+[package]
+name = "restring-core-algo"
+version = "1.1.0"
+edition = "2021"
+description = "Platform-neutral ReString core: rasterizer, greedy search, renderers, metrics"
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif"] }
+
+[lib]
+name = "restring_core"
+crate-type = ["rlib"]

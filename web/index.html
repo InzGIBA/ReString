@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReString playground</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.4rem; }
+  #drop { border: 2px dashed gray; border-radius: 8px; padding: 2rem; text-align: center; cursor: pointer; }
+  #drop.hover { border-color: royalblue; }
+  label { display: block; margin: 0.6rem 0 0.2rem; }
+  button { margin-top: 1rem; padding: 0.5rem 1.2rem; font-size: 1rem; }
+  #status { min-height: 1.4em; color: gray; }
+  canvas { max-width: 100%; margin-top: 1rem; border: 1px solid gray; image-rendering: auto; }
+  a { color: royalblue; }
+</style>
+</head>
+<body>
+<h1>ReString playground</h1>
+<p>Drop a photo, watch the greedy search wind a single thread around the nails. Everything runs locally in your browser: no upload, no server.</p>
+
+<div id="drop">drop a PNG/JPEG photo here, or click to pick one</div>
+<input id="file" type="file" accept="image/png,image/jpeg" hidden>
+
+<label>Layout
+  <select id="layout">
+    <option value="rect" selected>rectangle border</option>
+    <option value="circle">circle border</option>
+  </select>
+</label>
+<label>Pulls (<span id="pulls-label">600</span>, capped at 1000)
+  <input id="pulls" type="range" min="100" max="1000" step="50" value="600">
+</label>
+<label>Nail step (<span id="step-label">4</span>, smaller = more nails)
+  <input id="step" type="range" min="2" max="8" step="1" value="4">
+</label>
+<label>Thread strength (<span id="strength-label">0.10</span>)
+  <input id="strength" type="range" min="0.05" max="0.2" step="0.01" value="0.10">
+</label>
+<label>Center weight (0 = off)
+  <input id="weight" type="range" min="0" max="3" step="0.5" value="0">
+</label>
+
+<button id="render" disabled>Render</button>
+<p><a id="download" download="restring.png" hidden>download the PNG</a></p>
+<p id="status">loading the wasm module...</p>
+<canvas id="canvas" width="600" height="600"></canvas>
+
+<script type="module">
+import init, { load_image, generate, render_png } from './pkg/restring_wasm.js';
+
+const status = document.getElementById('status');
+const drop = document.getElementById('drop');
+const file = document.getElementById('file');
+const renderBtn = document.getElementById('render');
+const canvas = document.getElementById('canvas');
+const download = document.getElementById('download');
+
+let photo = null; // preprocessed WasmImage
+
+await init();
+status.textContent = 'wasm ready. drop a photo to start.';
+renderBtn.disabled = false;
+
+function readPhoto(fileOrHandle) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      photo = load_image(new Uint8Array(reader.result));
+      status.textContent = 'photo loaded. set the sliders and render.';
+    } catch (e) {
+      status.textContent = 'decode failed: ' + e.message;
+    }
+  };
+  reader.readAsArrayBuffer(fileOrHandle);
+}
+
+drop.addEventListener('click', () => file.click());
+file.addEventListener('change', () => readPhoto(file.files[0]));
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('hover'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('hover'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('hover');
+  if (e.dataTransfer.files.length) readPhoto(e.dataTransfer.files[0]);
+});
+
+for (const id of ['pulls', 'step', 'strength']) {
+  document.getElementById(id).addEventListener('input', e => {
+    document.getElementById(id + '-label').textContent = e.target.value;
+  });
+}
+
+renderBtn.addEventListener('click', () => {
+  if (!photo) { status.textContent = 'load a photo first.'; return; }
+  const pulls = Number(document.getElementById('pulls').value);
+  const step = Number(document.getElementById('step').value);
+  const strength = Number(document.getElementById('strength').value);
+  const weight = Number(document.getElementById('weight').value);
+  const layout = document.getElementById('layout').value;
+  status.textContent = 'searching...';
+  setTimeout(() => {
+    try {
+      const t0 = performance.now();
+      const art = generate(photo, layout, step, pulls, strength, weight > 0 ? weight : null);
+      const png = render_png(art, 600);
+      const blob = new Blob([png], { type: 'image/png' });
+      const ctx = canvas.getContext('2d');
+      const bitmap = createImageBitmap(blob);
+      bitmap.then(bm => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bm, 0, 0);
+      });
+      download.href = URL.createObjectURL(blob);
+      download.hidden = false;
+      const seconds = ((performance.now() - t0) / 1000).toFixed(1);
+      status.textContent = art.pulls() + ' pulls around ' + art.nails_count() +
+        ' nails, rendered in ' + seconds + ' s.';
+    } catch (e) {
+      status.textContent = 'render failed: ' + e.message;
+    }
+  }, 10);
+});
+</script>
+</body>
+</html>

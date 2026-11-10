@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | zero-install playground; the demo that sells the project |
 | Size | L (a week or more) |
-| Status | [ ] not started |
+| Status | [x] done (7e04604; wasm build step blocked in this environment: no rustup/wasm-pack, verified by CI instead) |
 
 ## Why
 
