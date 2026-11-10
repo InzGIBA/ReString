@@ -40,3 +40,7 @@ jobs:
       # pyproject.toml, src/restring/__init__.py and rust/Cargo.toml agree
       - run: uv run python scripts/check_version_sync.py
       - run: uv run pytest
+      # advisory: type-check the public surface; non-blocking on the rest
+      - name: Type-check the public API (advisory)
+        continue-on-error: true
+        run: uv run --with mypy mypy src/restring/api.py src/restring/palettes.py

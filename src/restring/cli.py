@@ -1,17 +1,14 @@
 import argparse
-import hashlib
 import json
 import logging
-import time
 from pathlib import Path
 
-from restring import _core, layouts, palettes
+from restring import _core, api, palettes
 from restring.animation import animate_project
 from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_array_rgb
-from restring.generator import Config, generate_bw, generate_palette, resolve_export_strength
+from restring.generator import resolve_export_strength
 from restring.image_transformations import largest_rect, largest_square, resize
 from restring.layouts import LayoutError
-from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
 from restring.poster import poster_svg, thread_lengths_mm
 from restring.project import load as load_project
 from restring.project import save as save_project
@@ -19,6 +16,7 @@ from restring.project import save as save_project
 logger = logging.getLogger(__name__)
 
 LONG_SIDE = 300
+RGB_TRIPLE = [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]
 
 
 def build_parser():
@@ -107,79 +105,6 @@ def render_project(proj, args):
     result.save_png(args.output_file)
 
 
-def resolve_layout(spec, parser, nail_step):
-    """Parse a --layout spec into (builder(shape) -> nails, label, aspect).
-    Grammar: circle | rect | polygon:sides[:count] | star:points:inner[:count]
-    | rings:r:count,r:count | svg:file.svg[:count], optional @aspect suffix.
-    circle and rect keep the -n density dial; the other layouts take explicit
-    counts (default 300)."""
-    aspect = 1.0
-    if "@" in spec:
-        spec, aspect_text = spec.rsplit("@", 1)
-        try:
-            aspect = float(aspect_text)
-        except ValueError:
-            parser.error(f"--layout aspect must be a number, got {aspect_text!r}")
-        if not 0.1 <= aspect <= 10.0:
-            parser.error(f"--layout aspect must sit in 0.1..10, got {aspect}")
-
-    parts = spec.split(":")
-    name = parts[0]
-    default_count = 300
-
-    def as_int(text, what, minimum):
-        try:
-            value = int(text)
-        except ValueError:
-            parser.error(f"--layout {what} must be an int, got {text!r}")
-        if value < minimum:
-            parser.error(f"--layout {what} must be >= {minimum}, got {value}")
-        return value
-
-    def as_float(text, what):
-        try:
-            return float(text)
-        except ValueError:
-            parser.error(f"--layout {what} must be a number, got {text!r}")
-
-    def build(shape):
-        if name in ("circle", "rect"):
-            if name == "rect":
-                return create_rectangle_nail_positions(shape, nail_step)
-            return create_circle_nail_positions(shape, nail_step)
-        if name == "polygon":
-            sides = as_int(parts[1], "polygon sides", 3) if len(parts) > 1 else 5
-            count = as_int(parts[2], "polygon count", 3) if len(parts) > 2 else default_count
-            return layouts.polygon(shape, sides, count)
-        if name == "star":
-            if len(parts) < 3:
-                parser.error("--layout star needs star:points:inner[:count]")
-            spikes = as_int(parts[1], "star points", 3)
-            inner = as_float(parts[2], "star inner radius")
-            count = as_int(parts[3], "star count", 3) if len(parts) > 3 else default_count
-            return layouts.star(shape, spikes, inner, count)
-        if name == "rings":
-            values = ":".join(parts[1:]).replace(",", ":").split(":")
-            if len(values) < 2 or len(values) % 2:
-                parser.error("--layout rings needs rings:r:count,r:count (pairs of radius, count)")
-            specs = []
-            for i in range(0, len(values), 2):
-                specs.append((as_float(values[i], "ring radius"),
-                              as_int(values[i + 1], "ring count", 3)))
-            return layouts.rings(shape, specs)
-        if name == "svg":
-            if len(parts) < 2:
-                parser.error("--layout svg needs svg:file.svg[:count]")
-            path = ":".join(parts[1:-1]) if len(parts) > 2 else parts[1]
-            count = as_int(parts[-1], "svg count", 3) if len(parts) > 2 else default_count
-            if not Path(path).exists():
-                parser.error(f"--layout svg file not found: {path}")
-            return layouts.from_svg(path, shape, count)
-        parser.error(f"unknown layout {name!r}; see --help")
-
-    return aspect, build
-
-
 def main(argv=None):
     strfmt = '[%(asctime)s] [%(name)s] [%(levelname)s]: %(message)s'
     datefmt = '%Y-%m-%d %H:%M:%S'
@@ -215,85 +140,65 @@ def main(argv=None):
     if args.anim and not args.project:
         parser.error("--anim needs --project")
 
-    config = Config(
-        side_len=args.side_len,
-        export_strength=args.export_strength,
-        pull_amount=args.pull_amount,
-        random_nails=args.random_nails,
-        radius1_multiplier=args.radius1_multiplier,
-        radius2_multiplier=args.radius2_multiplier,
-        wb=args.wb,
-        weight_peak=args.weight_peak,
+    if args.layout and args.rect:
+        parser.error("--rect and --layout are mutually exclusive")
+    layout_spec = args.layout or ("rect" if args.rect else "circle")
+    try:
+        _builder, _label, aspect = api.parse_layout_spec(layout_spec)
+    except ValueError as exc:
+        parser.error(f"bad --layout: {exc}")
+
+    palette_spec = "wb" if args.wb else ("rgb" if args.rgb else (args.palette or "bw"))
+    if args.rgb and args.palette:
+        logger.info("--rgb given, ignoring --palette")
+    try:
+        threads, _wb = api._resolve_threads(palette_spec)
+    except (palettes.PaletteError, ValueError) as exc:
+        parser.error(str(exc))
+    mode = "rgb" if threads is not None else "bw"
+    if args.project_out and mode == "rgb" and [t.rgb for t in threads] != RGB_TRIPLE:
+        parser.error("--project-out supports bw and the rgb palette only; other "
+                     "palettes carry no stored colors in format version 1")
+
+    options = api.GenerateOptions(
+        layout=layout_spec,
+        nail_step=args.nail_step,
+        pulls=args.pull_amount,
+        strength=args.export_strength,
+        palette=palette_spec,
+        grid=LONG_SIDE,
+        export_size=args.side_len,
+        weight=args.weight_peak,
         min_chord=args.min_chord,
+        rollback=args.rollback,
         realistic=args.realistic,
         canvas_size=args.canvas_size if args.canvas_size is not None else 400,
         thread_width=args.thread_width,
-        rollback=args.rollback,
     )
-
-    img = _core.Image.load(args.input_file)
-
-    if args.layout and args.rect:
-        parser.error("--rect and --layout are mutually exclusive")
-    aspect, build = resolve_layout(args.layout or ("rect" if args.rect else "circle"),
-                                   parser, args.nail_step)
-
-    if args.radius1_multiplier == 1 and args.radius2_multiplier == 1 and aspect == 1.0:
-        img = resize(largest_square(img), (LONG_SIDE, LONG_SIDE))
-    elif aspect != 1.0:
-        img = resize(largest_rect(img, aspect),
-                     (LONG_SIDE, int(round(LONG_SIDE * aspect))))
-
-    h, w, _ = img.shape()
-    shape = (h, w)
-
     try:
-        nails = build(shape)
-    except (LayoutError, ValueError) as exc:
+        run = api.generate(args.input_file, options)
+    except (ValueError, LayoutError) as exc:
         parser.error(f"bad --layout: {exc}")
-
-    layout_label = args.layout or ("rect" if args.rect else "circle")
-    logger.info(f"Nails amount: {len(nails)}")
-    run_started = time.perf_counter()
-
-    threads = None
-    if args.rgb:
-        threads = palettes.builtin_palette("rgb")
-        if args.palette:
-            logger.info("--rgb given, ignoring --palette")
-    elif args.palette:
-        threads = palettes.resolve_palette(args.palette)
-        logger.info(f"Palette: {', '.join(t.name for t in threads)} ({len(threads)} threads)")
-
-    if threads is not None:
-        result, orders = generate_palette(img, shape, nails, config, threads)
-        mode = "rgb"
-    else:
-        result, order = generate_bw(img, shape, nails, config)
-        orders = [order]
-        mode = "bw"
+    logger.info(f"Nails amount: {run.stats.nails}")
 
     if args.project_out:
-        if mode == "rgb" and [t.rgb for t in threads] != [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0),
-                                                          (0.0, 0.0, 1.0)]:
-            parser.error("--project-out supports bw and the rgb palette only; other "
-                         "palettes carry no stored colors in format version 1")
-        digest = hashlib.sha256(Path(args.input_file).read_bytes()).hexdigest()
+        digest = api.project_digest(args.input_file)
+        grid = LONG_SIDE if aspect == 1.0 else [LONG_SIDE, int(round(LONG_SIDE * aspect))]
         proj = save_project(
             args.project_out,
             mode=mode,
             config={
-                "grid": h if h == w else [h, w],
+                "grid": grid,
                 "wb": args.wb,
                 "nail_step": args.nail_step,
-                "layout": layout_label,
+                "layout": layout_spec,
                 "pull_budget": args.pull_amount,
                 "weight": args.weight_peak,
                 "min_chord": args.min_chord,
                 "random_nails": args.random_nails,
             },
-            nails=nails,
-            pull_orders=orders,
+            nails=run.nails,
+            pull_orders=run.pull_orders,
             input_digest=digest,
         )
         canvas_mm = args.canvas_size if args.canvas_size is not None else 260
@@ -306,19 +211,25 @@ def main(argv=None):
         if args.poster:
             write_poster(proj, args)
 
-    result.save_png(args.output_file)
+    run.image.save_png(args.output_file)
 
     if args.metrics:
-        out_h, out_w = result.shape()[:2]
-        target_resized = resize(img, (out_h, out_w))
+        out_h, out_w = run.image.shape()[:2]
+        target_source = _core.Image.load(args.input_file)
+        if aspect != 1.0:
+            target_img = resize(largest_rect(target_source, aspect),
+                                (LONG_SIDE, int(round(LONG_SIDE * aspect))))
+        else:
+            target_img = resize(largest_square(target_source), (LONG_SIDE, LONG_SIDE))
+        target_resized = resize(target_img, (out_h, out_w))
         target_gray = target_resized.gray(1.0)
-        render_gray = result if mode == "bw" else result.gray(1.0)
+        render_gray = run.image if mode == "bw" else run.image.gray(1.0)
         report = {
             "mode": mode,
-            "pulls": max(len(o) - 1 for o in orders),
-            "nails": len(nails),
+            "pulls": max(len(o) - 1 for o in run.pull_orders),
+            "nails": run.stats.nails,
             "export": [out_h, out_w],
-            "elapsed_s": round(time.perf_counter() - run_started, 2),
+            "elapsed_s": run.stats.elapsed_s,
             "mse": round(_core.mse(render_gray, target_gray), 4),
             "corr": round(_core.corr(render_gray, target_gray), 4),
             "ssim": round(_core.ssim(render_gray, target_gray), 4),

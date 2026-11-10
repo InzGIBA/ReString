@@ -142,19 +142,14 @@ Print at 100 percent scale, hammer the nails on the board outline, wind. Printin
 ### As a library
 
 ```python
-from restring import _core
-from restring.canvas import init_canvas, pull_order_to_array_bw
-from restring.generator import Config, create_art, generate_bw
-from restring.image_transformations import largest_square, resize
-from restring.nails import create_circle_nail_positions
+from restring import GenerateOptions, generate
 
-img = resize(largest_square(_core.Image.load("portrait.png")), (300, 300))
-nails = create_circle_nail_positions((300, 300), nail_step=4)
-result, pull_order = generate_bw(img, (300, 300), nails, Config(side_len=300, pull_amount=2000))
-result.save_png("out.png")
+result = generate("portrait.png", GenerateOptions(layout="rect", pulls=2000))
+result.image.save_png("out.png")
+print(result.stats.pulls_per_thread)
 ```
 
-Images travel as `_core.Image` objects. The pixel data stays in Rust memory, so calls pass references instead of copying arrays. The test suite and the analysis scripts show numpy bridging helpers you copy for your own asserts and plots.
+The full options table, the Result fields and the deprecated 1.x names: [docs/api.md](docs/api.md). Images travel as `_core.Image` objects; the pixel data stays in Rust memory, so calls pass references instead of copying arrays.
 
 ## Tuning
 

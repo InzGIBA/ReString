@@ -27,6 +27,10 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore:restring.generate_bw is deprecated:DeprecationWarning",
+    "ignore:restring.generate_rgb is deprecated:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 120

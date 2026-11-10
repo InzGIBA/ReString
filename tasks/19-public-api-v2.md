@@ -6,7 +6,7 @@
 | Depends on | none (synergy: T-08's Project and this task's Result serialize into each other, but neither requires the other) |
 | Unlocks | library adoption; a stable contract to document |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (05fe851) |
 
 ## Why
 
