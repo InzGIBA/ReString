@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | removes the project's main foot-gun |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (a7b1e30) |
 
 ## Why
 

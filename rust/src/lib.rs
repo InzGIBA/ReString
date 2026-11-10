@@ -1071,13 +1071,18 @@ fn render_bw(
 fn render_rgb(
     orders: Vec<Vec<u64>>,
     nails: Vec<(i64, i64)>,
-    strength: f64,
+    strengths: Vec<f64>,
     in_w: usize,
     in_h: usize,
     out_w: usize,
     out_h: usize,
     white: bool,
-) -> Image {
+) -> PyResult<Image> {
+    if strengths.len() != orders.len() {
+        return Err(PyValueError::new_err(
+            "render_rgb needs one strength per channel order",
+        ));
+    }
     let colors: [[f64; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
     let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h * 3];
@@ -1089,7 +1094,7 @@ fn render_rgb(
             for k in 0..rr.len() {
                 let px = (rr[k] as usize * out_w + cc[k] as usize).min(out_w * out_h - 1);
                 for c in 0..3 {
-                    canvas[px * 3 + c] += colors[color_idx][c] * val[k] * strength;
+                    canvas[px * 3 + c] += colors[color_idx][c] * val[k] * strengths[color_idx];
                 }
             }
         }
@@ -1097,7 +1102,7 @@ fn render_rgb(
     for v in canvas.iter_mut() {
         *v = v.clamp(0.0, 1.0);
     }
-    Image { data: canvas, w: out_w, h: out_h, ch: 3 }
+    Ok(Image { data: canvas, w: out_w, h: out_h, ch: 3 })
 }
 
 // ---------------------------------------------------------------------------

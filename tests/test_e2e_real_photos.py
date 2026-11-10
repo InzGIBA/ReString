@@ -18,7 +18,7 @@ from _helpers import image_to_numpy, load_gray, load_rgb
 from restring import _core
 from restring.canvas import init_canvas, pull_order_to_array_bw
 from restring.cli import main
-from restring.generator import Config, generate_bw
+from restring.generator import Config, generate_bw, resolve_export_strength
 from restring.image_transformations import largest_square, resize, rgb2gray
 from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
 
@@ -26,6 +26,7 @@ DATA = Path(__file__).parent / "data"
 PHOTOS = sorted(DATA.glob("portrait_*.png"))
 SHAPE = (64, 64)
 NAILS = create_circle_nail_positions(SHAPE, nail_step=4)
+SWEEP_GRID = [0.025, 0.05, 0.075, 0.1, 0.15, 0.2]  # docs/img/params/pulls.json grid
 
 
 def reference_image(path):
@@ -107,6 +108,32 @@ def center_mse(a, b):
     """MSE inside the central 50% box, the face region (experiment metric)."""
     box = (slice(a.shape[0] // 4, 3 * a.shape[0] // 4), slice(a.shape[1] // 4, 3 * a.shape[1] // 4))
     return float(np.mean((a[box] - b[box]) ** 2))
+
+
+@pytest.mark.parametrize("photo", PHOTOS, ids=lambda p: p.name)
+@pytest.mark.parametrize("budget", [500, 2000])
+def test_auto_export_strength_matches_hand_tuned(photo, budget):
+    """Auto -s must land within 2 percent of the best hand-tuned strength at
+    the measured budgets. Reference sweep: docs/img/params/pulls.json
+    (circle nails step 4, 300 px grid, prefixes of the saturation order)."""
+    ref_img = resize(largest_square(_core.Image.load(os.fspath(photo))), (300, 300))
+    reference = image_to_numpy(ref_img.gray(0.9))
+    nails = create_circle_nail_positions((300, 300), nail_step=4)
+
+    _, order = generate_bw(ref_img, (300, 300), nails,
+                           Config(side_len=300, pull_amount=budget))
+    pulls = len(order) - 1
+    auto = resolve_export_strength(pulls)
+
+    def render_mse(s):
+        rendered = pull_order_to_array_bw(order, init_canvas((300, 300)), nails, -s)
+        return mse(image_to_numpy(rendered), reference)
+
+    auto_mse = render_mse(auto)
+    best_hand = min(render_mse(s) for s in SWEEP_GRID)
+    assert auto_mse <= 1.02 * best_hand, \
+        f"auto s={auto:.3f} missed the hand-tuned optimum: " \
+        f"{auto_mse:.4f} vs best {best_hand:.4f} on {photo.name} at {pulls} pulls"
 
 
 @pytest.mark.parametrize("photo", PHOTOS, ids=lambda p: p.name)

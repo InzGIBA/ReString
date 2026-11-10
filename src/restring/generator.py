@@ -6,13 +6,31 @@ from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_a
 
 logger = logging.getLogger(__name__)
 
+# fitted s*(L) = k / L, least squares in log space over the uncensored points
+# of docs/img/params/pulls.json (k = 104.0, residual band x1.06); re-run
+# scripts/fit_export_strength.py to refit. The ceiling is 0.2, not 0.3: the
+# sweep grid tops out at 0.2 and that value wins every count up to 500 pulls,
+# while 0.3 measured worse than a blank canvas on synthetic fixtures.
+AUTO_EXPORT_K = 104.0
+AUTO_EXPORT_FLOOR = 0.03
+AUTO_EXPORT_CEIL = 0.2
+
+
+def resolve_export_strength(pull_count):
+    """Auto export strength from the actual pull count, clamped to 0.03..0.2.
+
+    The 1/L law and the constant come from scripts/fit_export_strength.py.
+    Anchors: measured best s is 0.1 at 1000 pulls and 0.05 at 2000 pulls.
+    """
+    return min(AUTO_EXPORT_CEIL, max(AUTO_EXPORT_FLOOR, AUTO_EXPORT_K / pull_count))
+
 
 @dataclass
 class Config:
     """Generation parameters shared by the B/W and RGB pipelines."""
 
     side_len: int = 300
-    export_strength: float = 0.1
+    export_strength: float | None = None
     pull_amount: int | None = None
     random_nails: int | None = None
     radius1_multiplier: float = 1
@@ -53,6 +71,7 @@ def generate_rgb(img, shape, nails, config: Config):
 
     # one greedy run per channel on a shared nail grid
     orders = []
+    exports = []
     for channel in range(3):
         order, _ = create_art(nails, img.channel(channel),
                               init_canvas(shape, black=config.wb), strength,
@@ -60,6 +79,11 @@ def generate_rgb(img, shape, nails, config: Config):
                               random_nails=config.random_nails,
                               min_chord=config.min_chord)
         orders.append(order)
+        magnitude = config.export_strength
+        if magnitude is None:
+            magnitude = resolve_export_strength(len(order) - 1)
+            logger.info(f"Export strength: {magnitude:.3f} (auto, {len(order) - 1} pulls)")
+        exports.append(magnitude if config.wb else -magnitude)
 
     max_pulls = max(len(o) for o in orders)
     orders = [o + [o[-1]] * (max_pulls - len(o)) for o in orders]
@@ -68,12 +92,11 @@ def generate_rgb(img, shape, nails, config: Config):
     out_w = int(config.side_len * config.radius2_multiplier)
     logger.info((out_h, out_w, 3))
 
-    export = config.export_strength if config.wb else -config.export_strength
     result = pull_order_to_array_rgb(
         orders,
         init_canvas((out_h, out_w, 3), black=config.wb),
         nails,
-        strength=export,
+        strength=exports,
         shape=shape,
     )
     return result, orders
@@ -98,7 +121,11 @@ def generate_bw(img, shape, nails, config: Config):
 
     out_h = int(config.side_len * config.radius1_multiplier)
     out_w = int(config.side_len * config.radius2_multiplier)
-    export = config.export_strength if config.wb else -config.export_strength
+    magnitude = config.export_strength
+    if magnitude is None:
+        magnitude = resolve_export_strength(len(pull_order) - 1)
+        logger.info(f"Export strength: {magnitude:.3f} (auto, {len(pull_order) - 1} pulls)")
+    export = magnitude if config.wb else -magnitude
     result = pull_order_to_array_bw(
         pull_order,
         init_canvas((out_h, out_w), black=config.wb),

@@ -1,9 +1,10 @@
 import numpy as np
+import pytest
 
 import restring
 from _helpers import image_from_numpy, image_to_numpy, save_image
 from restring.cli import build_parser, main
-from restring.generator import Config, generate_bw
+from restring.generator import Config, generate_bw, resolve_export_strength
 from restring.nails import create_circle_nail_positions
 
 
@@ -22,7 +23,7 @@ def test_parser_defaults():
     assert args.input_file == "in.png"
     assert args.output_file == "output.png"
     assert args.side_len == 300
-    assert args.export_strength == 0.1
+    assert args.export_strength is None  # auto: fitted from the pull count
     assert args.pull_amount is None
     assert args.random_nails is None
     assert args.radius1_multiplier == 1
@@ -78,3 +79,11 @@ def test_cli_min_chord_smoke(tmp_path):
           "--min-chord", "10"])
 
     assert output_file.exists()
+
+
+def test_resolve_export_strength():
+    # fitted k = 104.0, residual band x1.06 (scripts/fit_export_strength.py)
+    assert resolve_export_strength(1000) == pytest.approx(0.104)  # sweep anchor: best 0.1
+    assert resolve_export_strength(2000) == pytest.approx(0.052)  # sweep anchor: best 0.05
+    assert resolve_export_strength(50) == 0.2    # clamped at the ceiling
+    assert resolve_export_strength(7000) == 0.03  # clamped at the floor

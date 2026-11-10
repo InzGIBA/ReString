@@ -66,7 +66,10 @@ def test_bw_reduces_error_vs_blank():
     img = synthetic_disk()
     target = gray_target(img)
 
-    result, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=100))
+    # pinned to the historical default 0.1: these thresholds are calibrated
+    # for it. The 1/L auto fit targets the 300 px grid (see docs/tuning.md).
+    result, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=100,
+                                                      export_strength=0.1))
 
     blank_mse = mse(np.ones(SHAPE), target)  # measured: 0.081
     assert mse(image_to_numpy(result), target) <= 0.45 * blank_mse  # measured: 0.027
@@ -76,7 +79,9 @@ def test_bw_beats_random_baseline():
     img = synthetic_disk()
     target = gray_target(img)
 
-    result, order = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=150))
+    # pinned to 0.1: the random baseline below renders at -0.1 too
+    result, order = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=150,
+                                                          export_strength=0.1))
     greedy_mse = mse(image_to_numpy(result), target)  # measured: 0.033
 
     for seed in (0, 1, 2):
@@ -90,7 +95,8 @@ def test_bw_ssim_above_threshold():
 
     # SSIM peaks at moderate pull counts: the render strength (0.1) is twice the
     # simulation strength (0.05), so over-pulling overshoots the target
-    result, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=30))
+    result, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=30,
+                                                      export_strength=0.1))
 
     assert ssim(image_from_numpy(target), result) >= 0.30
 
@@ -99,8 +105,11 @@ def test_bw_more_pulls_not_worse():
     img = synthetic_disk()
     target = gray_target(img)
 
-    result_30, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=30))
-    result_150, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=150))
+    # pinned to 0.1 so the comparison isolates the pull count
+    result_30, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=30,
+                                                         export_strength=0.1))
+    result_150, _ = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=150,
+                                                          export_strength=0.1))
 
     assert mse(image_to_numpy(result_150), target) <= 0.8 * mse(image_to_numpy(result_30), target)
 
@@ -134,7 +143,9 @@ def test_rgb_reduces_error_per_channel():
     img = synthetic_color()
     reference = image_to_numpy(img)
 
-    result, _ = generate_rgb(img, SHAPE, NAILS, Config(side_len=64, pull_amount=100))
+    # pinned to the historical default 0.1 (thresholds calibrated for it)
+    result, _ = generate_rgb(img, SHAPE, NAILS, Config(side_len=64, pull_amount=100,
+                                                       export_strength=0.1))
 
     for channel in range(3):
         blank_mse = mse(np.ones(SHAPE), reference[:, :, channel])
@@ -149,7 +160,10 @@ def test_cli_bw_quality(tmp_path):
     output_file = tmp_path / "output.png"
     save_image(input_file, image_to_numpy(img))
 
-    main(["-i", str(input_file), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "150"])
+    # -s 0.1: thresholds calibrated for the historical default (auto 1/L fit
+    # targets the 300 px grid, see docs/tuning.md)
+    main(["-i", str(input_file), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "150",
+          "-s", "0.1"])
 
     result = load_gray(output_file)
     assert result.shape == (64, 64)
@@ -169,7 +183,8 @@ def test_cli_rgb_quality(tmp_path):
     output_file = tmp_path / "output.png"
     save_image(input_file, image_to_numpy(img))
 
-    main(["-i", str(input_file), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "100", "--rgb"])
+    main(["-i", str(input_file), "-o", str(output_file), "-d", "64", "-n", "4", "-l", "100",
+          "--rgb", "-s", "0.1"])
 
     result = load_rgb(output_file)
     assert result.shape == (64, 64, 3)

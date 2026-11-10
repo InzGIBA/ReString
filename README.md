@@ -56,7 +56,7 @@ uv sync
 ### Run your first example
 
 ```bash
-uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000 -s 0.05   # best quality, ~1.4 s
+uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000   # best quality, ~1.4 s
 ```
 
 Expected result:
@@ -75,13 +75,13 @@ Three presets cover most jobs (timed on a 24-core Linux box):
 
 ```bash
 # fast preview, ~0.3 s
-uv run restring -i portrait.png -o out.png --rect -l 300 -s 0.2
+uv run restring -i portrait.png -o out.png --rect -l 300
 
 # balanced, ~0.6 s
-uv run restring -i portrait.png -o out.png --rect -n 4 -l 2000 -s 0.05
+uv run restring -i portrait.png -o out.png --rect -n 4 -l 2000
 
 # maximum measured quality, ~1.4 s
-uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000 -s 0.05
+uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000
 ```
 
 ### CLI reference
@@ -93,7 +93,7 @@ uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000 -s 0.05
 | `-d <int>` | output side length in pixels | 300 |
 | `-n <int>` | nail step. Smaller values place more nails. Minimum 1 | 4 |
 | `-l <int>` | iteration budget. Without the flag the search stops after 3 pulls with no improvement | run to exhaustion |
-| `-s <float>` | thread strength at export, 0..1 | 0.1 |
+| `-s <float>` | thread strength at export, 0..1. Leave unset and the run derives the value from the actual pull count: k/L with k=104, clamped to 0.03..0.2, within 2 percent of the hand-tuned optimum at the measured budgets | auto |
 | `-r <int>` | scan a fixed random subset of candidates each iteration. Trades quality for speed. Good values sit near 100 to 150 | all nails |
 | `-r1 <float>` | vertical nail ellipse multiplier | 1 |
 | `-r2 <float>` | horizontal nail ellipse multiplier | 1 |
@@ -124,12 +124,12 @@ Images travel as `_core.Image` objects. The pixel data stays in Rust memory, so 
 
 ## Tuning
 
-The `-s` value matters more than any other flag. The working simulation darkens each pull with strength 0.05; the export accumulates with strength `-s`. When `-s` is too high for the thread count, the render reaches its target halfway, then overshoots and darkens. The optimum scales as 1 over the thread count.
+`-s` is fitted for you: the run derives the export strength from the actual pull count (104/L clamped to 0.03..0.2) and lands within 2 percent of the hand-tuned optimum at the measured budgets. The working simulation darkens each pull with strength 0.05; the export accumulates with strength `-s`. When `-s` is too high for the thread count, the render reaches its target halfway, then overshoots and darkens. Manual `-s` values stay for special cases, see the tuning guide.
 
 | Flag | Recommended | Rule |
 |---|---|---|
 | `--rect` | always on for square portraits | 1.8 to 2.7x lower error than the circle |
-| `-s` | 0.05 above 1000 threads, 0.15 to 0.2 for previews | optimum scales as 1 over thread count |
+| `-s` | leave unset, auto fits the pull count | measured optimum scales as 1 over thread count, k=104 clamped 0.03 to 0.2 |
 | `-l` | up to saturation, about 2500 to 2900 threads | beyond saturation the search finds no improvements |
 | `-n` | 4 for the knee, 2 for maximum quality | 844 circle nails buy 6 percent error reduction at 4x the cost |
 | `-r` | 100 to 150 while exploring, drop for the final run | k=100 saves 40 percent of the time for 15 percent error |
@@ -150,7 +150,7 @@ uv sync
 ### Checks
 
 ```bash
-uv run pytest                   # 46 tests, 1.8 s
+uv run pytest                   # 61 tests, ~6 s
 uv run ruff check .
 uv run python scripts/benchmark.py --label before   # or after, then --plot
 ```

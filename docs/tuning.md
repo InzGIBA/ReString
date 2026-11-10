@@ -7,7 +7,7 @@ Every CLI flag, measured on face-centered portrait fixtures (`tests/data/`). Eac
 | Flag | Recommended value | Rule |
 |---|---|---|
 | `--rect` | always on for square portraits | 1.8 to 2.7x lower error than the circle |
-| `-s` | 0.05 above 1000 threads, 0.1 near 500 to 1000, 0.15 to 0.2 for previews | optimum scales as 1 over thread count |
+| `-s` | unset (auto) | auto fits 104/L to the actual pull count, clamped 0.03..0.2, within 2 percent of hand-tuned |
 | `-l` | up to saturation, about 2500 to 2900 threads | beyond saturation the search finds no improvements |
 | `-n` | 4 for the knee, 2 for maximum quality | 844 circle nails buy 6 percent error reduction at 4x the cost |
 | `-r` | 100 to 150 while exploring, drop the flag for the final run | k=100 saves 40 percent of the time for 15 percent error |
@@ -17,7 +17,9 @@ Every CLI flag, measured on face-centered portrait fixtures (`tests/data/`). Eac
 
 ## Thread count and export strength
 
-The two flags interact. The working simulation darkens each pull with strength 0.05. The export accumulates with strength `-s`. When `-s` doubles the working strength, the render reaches its target around halfway and overshoots after.
+By default the export strength is auto: the run waits for the search to finish, takes the actual pull count L and applies s = 104 / L, clamped to 0.03..0.2. The law and the constant come from the sweep below, fitted by `scripts/fit_export_strength.py` (least squares in log space over the uncensored points, k = 104.0, residual band x1.06). Measured anchors: the best hand-tuned strength is 0.2 at 500 pulls, 0.1 at 1000 and 0.05 at 2000. The resolver reproduces all three. On both portrait fixtures at 500 and 2000 pulls the auto render MSE sits within 2 percent of the hand-tuned optimum (`tests/test_e2e_real_photos.py`). The 0.2 ceiling: the sweep optimum tops out at 0.2 up to 500 pulls, and 0.3 measured worse than a blank canvas on synthetic fixtures. An explicit `-s` overrides the auto value and logs nothing.
+
+Advanced: manual values. The working simulation darkens each pull with strength 0.05. The export accumulates with strength `-s`. When `-s` doubles the working strength, the render reaches its target around halfway and overshoots after.
 
 ![MSE against thread count per strength](img/params/pulls_mse.png)
 
@@ -93,16 +95,16 @@ Measured on both portrait fixtures at 2000 threads (`--rect`, `-s 0.05`): center
 
 ```bash
 # preview, ~0.3 s
-uv run restring -i face.png -o out.png --rect -l 300 -s 0.2
+uv run restring -i face.png -o out.png --rect -l 300
 
 # balanced, ~0.6 s
-uv run restring -i face.png -o out.png --rect -n 4 -l 2000 -s 0.05
+uv run restring -i face.png -o out.png --rect -n 4 -l 2000
 
 # maximum measured quality, ~1.4 s
-uv run restring -i face.png -o out.png --rect -n 2 -l 3000 -s 0.05
+uv run restring -i face.png -o out.png --rect -n 2 -l 3000
 
 # physical winding, 3000 to 7000 threads
-uv run restring -i face.png -o out.png --rect -n 2 -l 3000 -s 0.05
+uv run restring -i face.png -o out.png --rect -n 2 -l 3000
 ```
 
 ## Limits

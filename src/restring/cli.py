@@ -16,7 +16,7 @@ def build_parser():
     parser.add_argument('-i', action="store", dest="input_file")
     parser.add_argument('-o', action="store", dest="output_file", default="output.png")
     parser.add_argument('-d', action="store", type=int, dest="side_len", default=300)
-    parser.add_argument('-s', action="store", type=float, dest="export_strength", default=0.1)
+    parser.add_argument('-s', action="store", type=float, dest="export_strength", default=None)
     parser.add_argument('-l', action="store", type=int, dest="pull_amount", default=None)
     parser.add_argument('-r', action="store", type=int, dest="random_nails", default=None)
     parser.add_argument('-r1', action="store", type=float, dest="radius1_multiplier", default=1)
