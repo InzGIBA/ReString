@@ -8,6 +8,7 @@ from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_a
 from restring.generator import Config, generate_bw, generate_rgb, resolve_export_strength
 from restring.image_transformations import largest_square, resize
 from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
+from restring.poster import poster_svg, thread_lengths_mm
 from restring.project import load as load_project
 from restring.project import save as save_project
 
@@ -31,10 +32,21 @@ def build_parser():
     parser.add_argument('--min-chord', action="store", type=float, dest="min_chord", default=None)
     parser.add_argument('--project', action="store", dest="project", default=None)
     parser.add_argument('--project-out', action="store", dest="project_out", default=None)
+    parser.add_argument('--poster', action="store", dest="poster", default=None)
+    parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size", default=260)
+    parser.add_argument('--number-every', action="store", type=int, dest="number_every", default=10)
+    parser.add_argument('--poster-preview', action="store_true")
     parser.add_argument('--wb', action="store_true")
     parser.add_argument('--rgb', action="store_true")
     parser.add_argument('--rect', action="store_true")
     return parser
+
+
+def write_poster(proj, args):
+    svg = poster_svg(proj, canvas_size_mm=args.canvas_size,
+                     number_every=args.number_every, show_preview=args.poster_preview)
+    Path(args.poster).write_text(svg)
+    logger.info(f"Poster written: {args.poster}")
 
 
 def render_project(proj, args):
@@ -89,7 +101,12 @@ def main(argv=None):
         if not args.rgb and proj.mode == "rgb":
             parser.error("this project is an RGB run, pass --rgb to re-render it")
         render_project(proj, args)
+        if args.poster:
+            write_poster(proj, args)
         return
+
+    if args.poster and not args.project_out:
+        parser.error("--poster needs --project or --project-out")
 
     config = Config(
         side_len=args.side_len,
@@ -129,7 +146,7 @@ def main(argv=None):
 
     if args.project_out:
         digest = hashlib.sha256(Path(args.input_file).read_bytes()).hexdigest()
-        save_project(
+        proj = save_project(
             args.project_out,
             mode=mode,
             config={
@@ -146,7 +163,14 @@ def main(argv=None):
             pull_orders=orders,
             input_digest=digest,
         )
+        lengths_mm = thread_lengths_mm(proj, args.canvas_size)
+        if mode == "rgb":
+            logger.info("Thread lengths: " + "/".join(f"{length / 1000:.0f}" for length in lengths_mm) + " m")
+        else:
+            logger.info(f"Thread length: {lengths_mm[0] / 1000:.0f} m")
         logger.info(f"Project written: {args.project_out}")
+        if args.poster:
+            write_poster(proj, args)
 
     result.save_png(args.output_file)
 

@@ -6,7 +6,7 @@
 | Depends on | T-08 (`.restring` project format as input) |
 | Unlocks | the maker workflow: print, hammer nails, wind |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (33fa256) |
 
 ## Why
 

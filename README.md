@@ -117,6 +117,17 @@ restring --project result.restring -o out2.png   # byte-identical re-render
 
 The current `-s` and `-d` apply at re-render time. Schema and compatibility promise: [docs/project-format.md](docs/project-format.md).
 
+### Wind it for real
+
+Turn a result into a printable poster: numbered nails, the footer with the nail count, pull count and total thread length in meters.
+
+```bash
+restring -i portrait.png -o out.png --rect -l 2000 --project-out result.restring --poster poster.svg
+restring --project result.restring --poster poster.svg --canvas-size 300
+```
+
+Print at 100 percent scale, hammer the nails on the board outline, wind. Printing checklist and thread buying guidance: [docs/winding.md](docs/winding.md).
+
 ### As a library
 
 ```python

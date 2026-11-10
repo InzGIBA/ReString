@@ -41,7 +41,7 @@ class Project:
 
 
 def save(path, *, mode, config, nails, pull_orders, input_digest):
-    """Write a project file. `restring_version` records the writing version."""
+    """Write a project file and return the equivalent Project object."""
     import restring
 
     data = {
@@ -56,6 +56,16 @@ def save(path, *, mode, config, nails, pull_orders, input_digest):
         "restring_version": restring.__version__,
     }
     Path(path).write_text(json.dumps(data))
+    return Project(
+        mode=mode,
+        config=dict(config),
+        nails=[(int(n[0]), int(n[1])) for n in data["nails"]],
+        pull_orders=[list(order) for order in data["pull_orders"]],
+        input_digest=input_digest,
+        created=data["created"],
+        version=FORMAT_VERSION,
+        restring_version=data["restring_version"],
+    )
 
 
 def load(path):

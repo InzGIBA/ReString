@@ -126,6 +126,27 @@ def test_cli_project_rejects_input_combo(tmp_path):
         main(["--project", "p.restring", "-i", "in.png", "-o", "out.png"])
 
 
+def test_cli_poster_end_to_end(tmp_path):
+    import xml.etree.ElementTree as ET
+
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
+    poster_file = tmp_path / "poster.svg"
+
+    # poster straight from a generate run
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "60",
+          "--rect", "--project-out", str(project_file), "--poster", str(poster_file)])
+    assert ET.fromstring(poster_file.read_text()).tag.endswith("svg")
+
+    # and from an existing project
+    poster_file.unlink()
+    main(["--project", str(project_file), "-o", str(tmp_path / "out2.png"),
+          "--poster", str(poster_file)])
+    assert ET.fromstring(poster_file.read_text()).tag.endswith("svg")
+
+
 def test_resolve_export_strength():
     # fitted k = 104.0, residual band x1.06 (scripts/fit_export_strength.py)
     assert resolve_export_strength(1000) == pytest.approx(0.104)  # sweep anchor: best 0.1
