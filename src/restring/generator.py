@@ -1,8 +1,8 @@
 import logging
 from dataclasses import dataclass
 
-from restring import _core
-from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_array_rgb
+from restring import _core, palettes
+from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_array_palette
 
 logger = logging.getLogger(__name__)
 
@@ -84,17 +84,36 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
     return [int(i) for i in order], final
 
 
-def generate_rgb(img, shape, nails, config: Config):
+def separate_targets(img, threads, shape):
+    """Decompose the RGB target into one gray target per thread: each map is
+    the channel-weighted mean of the target pixels, weights from the thread
+    color. The compatibility RGB triple reduces to the plain channel split,
+    pixel-identical to the pre-palette pipeline (img.channel per thread)."""
+    h, w = shape
+    pixels = img.tolist()
+    weights = [t.rgb for t in threads]
+    denoms = [sum(w) for w in weights]
+    maps = [[[0.0] * w for _ in range(h)] for _ in threads]
+    for r in range(h):
+        row = pixels[r]
+        for c in range(w):
+            pr, pg, pb = row[c][0], row[c][1], row[c][2]
+            for k, (wr, wg, wb) in enumerate(weights):
+                maps[k][r][c] = (wr * pr + wg * pg + wb * pb) / denoms[k]
+    return [_core.Image.from_nested(m) for m in maps]
+
+
+def generate_palette(img, shape, nails, config: Config, threads):
     # measured working strength 0.05: global color MSE improves 13 to 17
     # percent over the old 0.1 on both portrait fixtures and grayscale SSIM
     # rises (docs/research/rgb-channels-experiment.md)
     strength = 0.05 if config.wb else -0.05
 
-    # one greedy run per channel on a shared nail grid
+    # one greedy run per thread on a shared nail grid
     orders = []
     exports = []
-    for channel in range(3):
-        order, _ = create_art(nails, img.channel(channel),
+    for target in separate_targets(img, threads, shape):
+        order, _ = create_art(nails, target,
                               init_canvas(shape, black=config.wb), strength,
                               i_limit=config.pull_amount,
                               random_nails=config.random_nails,
@@ -111,17 +130,22 @@ def generate_rgb(img, shape, nails, config: Config):
 
     out_h = int(config.side_len * config.radius1_multiplier)
     out_w = int(config.side_len * config.radius2_multiplier)
-    logger.info((out_h, out_w, 3))
+    logger.info((out_h, out_w, len(threads)))
 
-    result = pull_order_to_array_rgb(
+    result = pull_order_to_array_palette(
         orders,
         init_canvas((out_h, out_w, 3), black=config.wb),
         nails,
+        [t.rgb for t in threads],
         strength=exports,
         shape=shape,
         thread_px=_thread_px(config, config.side_len),
     )
     return result, orders
+
+
+def generate_rgb(img, shape, nails, config: Config):
+    return generate_palette(img, shape, nails, config, palettes.builtin_palette("rgb"))
 
 
 def generate_bw(img, shape, nails, config: Config):

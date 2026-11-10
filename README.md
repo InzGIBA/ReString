@@ -97,7 +97,8 @@ restring -i portrait.png -o out.png --rect -n 2 -l 3000
 | `-r1 <float>` | vertical nail ellipse multiplier | 1 |
 | `-r2 <float>` | horizontal nail ellipse multiplier | 1 |
 | `--rect` | nails on the rectangle border instead of the circle. Better for square portraits, about 2x lower error | circle |
-| `--rgb` | colored output with three interleaved threads | black and white |
+| `--rgb` | colored output with three interleaved pure RGB threads | black and white |
+| `--palette <name|file>` | thread palette: `rgb`, `cmy`, `cmyk`, or a JSON file of `{"name", "rgb": [r, g, b]}` colors (cap 8 threads). CMYK measures 42 to 45 percent better color MSE than RGB at an equal budget | off |
 | `--wb` | white thread on a black canvas | black on white |
 | `--weight <float>` | importance weighting. A Gaussian weight map steers threads toward the image center, where the viewer looks. Suggested range 1.5 to 5.0. Portrait subjects only, about 25 percent more scan time | off |
 | `--min-chord <px>` | candidate filter: chords shorter than the distance in working-grid pixels are banned. Portrait measurement: the greedy never picks short chords, the filter only degrades MSE past 250 px. Intended for sparse custom layouts | off |

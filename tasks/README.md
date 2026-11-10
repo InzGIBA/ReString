@@ -52,7 +52,7 @@ needs a new hypothesis, not persistence.
 | [09](09-winding-poster-svg.md) | Winding poster SVG + thread length | Q2 · v1.3.0 | 08 | M | ✅ |
 | [10](10-winding-animation-gif.md) | Winding animation GIF | Q2 · v1.3.0 | 08 | M | ✅ |
 | [11](11-thread-thickness-render.md) | Physical thread-thickness render | Q2 · v1.3.0 | — | M | ✅ |
-| [12](12-thread-palette-system.md) | Thread palette system (CMYK, real floss) | Q2 · v1.3.0 | — | L |
+| [12](12-thread-palette-system.md) | Thread palette system (CMYK, real floss) | Q2 · v1.3.0 | — | L | ✅ |
 | [13](13-custom-nail-layouts.md) | Custom nail layouts (polygon, star, rings, SVG) | Q3 · v1.4.0 | — | M |
 | [14](14-adaptive-nail-placement.md) | Adaptive nail placement (research) | Q3 · v1.4.0 | — (synergy with 13) | M |
 | [15](15-best-prefix-rollback.md) | Best-prefix rollback on stagnation | Q3 · v1.4.0 | — | S |

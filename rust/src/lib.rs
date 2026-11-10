@@ -1364,7 +1364,42 @@ fn render_bw(
     Image { data: canvas, w: out_w, h: out_h, ch: 1 }
 }
 
+/// Shared accumulation for palette renders: one interleaved pass over the
+/// per-thread orders, each thread adding its color * strength per touched
+/// pixel, clamp at the end. The loop structure and arithmetic are identical
+/// to the original render_rgb.
+fn render_palette_impl(
+    orders: &[Vec<u64>],
+    nails: &[(i64, i64)],
+    colors: &[(f64, f64, f64)],
+    strengths: &[f64],
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+) -> Image {
+    let color_triples: Vec<[f64; 3]> = colors.iter().map(|c| [c.0, c.1, c.2]).collect();
+    let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h * 3];
+    let pulls = orders.first().map(|o| o.len().saturating_sub(1)).unwrap_or(0);
+    for step in 0..pulls {
+        for (color_idx, order) in orders.iter().enumerate() {
+            let (a, b) = (order[step] as usize, order[step + 1] as usize);
+            let (rr, cc, val) = zingl_line(nails[a].0, nails[a].1, nails[b].0, nails[b].1);
+            for k in 0..rr.len() {
+                let px = (rr[k] as usize * out_w + cc[k] as usize).min(out_w * out_h - 1);
+                for c in 0..3 {
+                    canvas[px * 3 + c] += color_triples[color_idx][c] * val[k] * strengths[color_idx];
+                }
+            }
+        }
+    }
+    for v in canvas.iter_mut() {
+        *v = v.clamp(0.0, 1.0);
+    }
+    Image { data: canvas, w: out_w, h: out_h, ch: 3 }
+}
+
 /// Render interleaved RGB pull orders (port of canvas.pull_order_to_array_rgb).
+/// Thin wrapper over render_palette with the fixed compatibility triple.
 #[pyfunction]
 fn render_rgb(
     orders: Vec<Vec<u64>>,
@@ -1381,18 +1416,51 @@ fn render_rgb(
             "render_rgb needs one strength per channel order",
         ));
     }
-    let colors: [[f64; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let colors = [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)];
     let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
+    Ok(render_palette_impl(&orders, &nails, &colors, &strengths, out_w, out_h, white))
+}
+
+/// Render interleaved pull orders for an arbitrary thread palette: one color
+/// triple per order, additive-on-white (each thread darkens the channels it
+/// carries). With `thread_px` set, segments stamp with the physical width.
+#[pyfunction(signature = (orders, nails, colors, strengths, in_w, in_h, out_w, out_h, white, thread_px=None))]
+fn render_palette(
+    py: Python<'_>,
+    orders: Vec<Vec<u64>>,
+    nails: Vec<(i64, i64)>,
+    colors: Vec<(f64, f64, f64)>,
+    strengths: Vec<f64>,
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+    thread_px: Option<f64>,
+) -> PyResult<Image> {
+    if colors.len() != orders.len() || strengths.len() != orders.len() {
+        return Err(PyValueError::new_err(
+            "render_palette needs one color and one strength per order",
+        ));
+    }
+    let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
+    if thread_px.is_none() {
+        return Ok(render_palette_impl(&orders, &nails, &colors, &strengths, out_w, out_h, white));
+    }
+    let half_width = thread_px.unwrap() / 2.0;
+    let color_triples: Vec<[f64; 3]> = colors.iter().map(|c| [c.0, c.1, c.2]).collect();
     let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h * 3];
     let pulls = orders.first().map(|o| o.len().saturating_sub(1)).unwrap_or(0);
     for step in 0..pulls {
         for (color_idx, order) in orders.iter().enumerate() {
             let (a, b) = (order[step] as usize, order[step + 1] as usize);
-            let (rr, cc, val) = zingl_line(nails[a].0, nails[a].1, nails[b].0, nails[b].1);
+            let (rr, cc, cov) = thick_line(nails[a].0, nails[a].1, nails[b].0, nails[b].1, half_width);
             for k in 0..rr.len() {
-                let px = (rr[k] as usize * out_w + cc[k] as usize).min(out_w * out_h - 1);
-                for c in 0..3 {
-                    canvas[px * 3 + c] += colors[color_idx][c] * val[k] * strengths[color_idx];
+                let r = rr[k].clamp(0, out_h as i64 - 1) as usize;
+                let c = cc[k].clamp(0, out_w as i64 - 1) as usize;
+                for ch in 0..3 {
+                    canvas[(r * out_w + c) * 3 + ch] +=
+                        color_triples[color_idx][ch] * cov[k] * strengths[color_idx];
                 }
             }
         }
@@ -1877,6 +1945,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(local_search, m)?)?;
     m.add_function(wrap_pyfunction!(render_bw, m)?)?;
     m.add_function(wrap_pyfunction!(render_rgb, m)?)?;
+    m.add_function(wrap_pyfunction!(render_palette, m)?)?;
     m.add_function(wrap_pyfunction!(animate_bw, m)?)?;
     m.add_function(wrap_pyfunction!(animate_rgb, m)?)?;
     m.add_function(wrap_pyfunction!(save_gif, m)?)?;

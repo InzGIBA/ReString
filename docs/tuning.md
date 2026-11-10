@@ -15,6 +15,7 @@ Every CLI flag, measured on face-centered portrait fixtures (`tests/data/`). Eac
 | `--weight` | 3.0 for portraits, off for other subjects | center MSE falls 24 to 28 percent, global MSE rises 3 percent |
 | `--min-chord` | off | the greedy never picks short chords. Thresholds bite only past 230 px and cost up to 24 percent MSE |
 | `--realistic` | on when exporting well above 300 px | 0.3 mm thread at a 400 mm board beats the hairline by 35 percent at the 1200 px export |
+| `--palette` | cmyk for color runs | CMYK beats the RGB triple by 42 to 45 percent color MSE at an equal total budget |
 
 ## Thread count and export strength
 
@@ -97,6 +98,10 @@ Measured on both portrait fixtures at 2000 threads (`--rect`, `-s 0.05`): center
 ## Physical thread model
 
 `--realistic` switches the render to threads of a physical width: `--thread-width` millimeters of thread on a `--canvas-size` millimeter board, scaled to the export. At the default 300 px export the width computes below 0.15 px and the render barely differs from the hairline. At large exports it matters: 0.3 mm on a 400 mm board (0.9 px at the 1200 px export) matches the hairline's double pull budget at 500 pulls and beats the hairline by 35 percent at 2000 pulls. The search never changes, only the render. Numbers: [research/thread-model-experiment.md](research/thread-model-experiment.md).
+
+## Thread palettes
+
+`--palette <name|file.json>` picks the thread colors: built-ins are `rgb` (the compatibility triple), `cmy` and `cmyk`; a path loads a JSON list of `{"name", "rgb": [r, g, b]}` entries (ship a subset you own, up to 8 threads; see `examples/palettes/dmc-starter.json`). `--rgb` stays as sugar for `--palette rgb` and wins if both are given. Measured at an equal total budget of 3000 pulls: cmyk improves color MSE 42 to 45 percent over rgb on both fixtures, cmy 37 to 40 percent. Color MSE scales with pulls per thread, so keep `total budget / threads` in the hundreds. Full tables: [research/palette-experiment.md](research/palette-experiment.md).
 
 ## Presets
 

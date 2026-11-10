@@ -3,10 +3,10 @@ import hashlib
 import logging
 from pathlib import Path
 
-from restring import _core
+from restring import _core, palettes
 from restring.animation import animate_project
 from restring.canvas import init_canvas, pull_order_to_array_bw, pull_order_to_array_rgb
-from restring.generator import Config, generate_bw, generate_rgb, resolve_export_strength
+from restring.generator import Config, generate_bw, generate_palette, resolve_export_strength
 from restring.image_transformations import largest_square, resize
 from restring.nails import create_circle_nail_positions, create_rectangle_nail_positions
 from restring.poster import poster_svg, thread_lengths_mm
@@ -40,6 +40,9 @@ def build_parser():
     parser.add_argument('--anim-frames', action="store", type=int, dest="anim_frames", default=180)
     parser.add_argument('--wb', action="store_true")
     parser.add_argument('--rgb', action="store_true")
+    parser.add_argument('--palette', action="store", dest="palette", default=None,
+                        help="thread palette: built-in name (rgb, cmy, cmyk) or a JSON "
+                             "palette file path")
     parser.add_argument('--rect', action="store_true")
     parser.add_argument('--realistic', action="store_true")
     parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size",
@@ -154,8 +157,17 @@ def main(argv=None):
 
     logger.info(f"Nails amount: {len(nails)}")
 
+    threads = None
     if args.rgb:
-        result, orders = generate_rgb(img, shape, nails, config)
+        threads = palettes.builtin_palette("rgb")
+        if args.palette:
+            logger.info("--rgb given, ignoring --palette")
+    elif args.palette:
+        threads = palettes.resolve_palette(args.palette)
+        logger.info(f"Palette: {', '.join(t.name for t in threads)} ({len(threads)} threads)")
+
+    if threads is not None:
+        result, orders = generate_palette(img, shape, nails, config, threads)
         mode = "rgb"
     else:
         result, order = generate_bw(img, shape, nails, config)
@@ -163,6 +175,10 @@ def main(argv=None):
         mode = "bw"
 
     if args.project_out:
+        if mode == "rgb" and [t.rgb for t in threads] != [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0),
+                                                          (0.0, 0.0, 1.0)]:
+            parser.error("--project-out supports bw and the rgb palette only; other "
+                         "palettes carry no stored colors in format version 1")
         digest = hashlib.sha256(Path(args.input_file).read_bytes()).hexdigest()
         proj = save_project(
             args.project_out,

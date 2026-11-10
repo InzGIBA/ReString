@@ -55,3 +55,24 @@ def pull_order_to_array_rgb(orders, canvas, nails, colors=None, strength=0.1, sh
         return _core.render_rgb_thick(orders_int, nails_int, strengths,
                                       in_w, in_h, w, h, white, float(thread_px))
     return _core.render_rgb(orders_int, nails_int, strengths, in_w, in_h, w, h, white)
+
+
+def pull_order_to_array_palette(orders, canvas, nails, colors, strength=0.1, shape=None,
+                                thread_px=None):
+    """Render interleaved pull orders for an arbitrary thread palette:
+    `colors` is one (r, g, b) triple per order; `strength` is one float or a
+    per-channel sequence, as in the RGB renderer. `thread_px` switches to the
+    thick physical renderer like the RGB path (colors pass through)."""
+    h, w, _ = canvas.shape()
+    white = canvas.pixel(0, 0, 0) >= 0.5
+    in_h, in_w = shape[:2] if shape is not None else (h, w)
+    strengths = ([float(s) for s in strength] if isinstance(strength, (list, tuple))
+                 else [float(strength)] * len(orders))
+    orders_int = [[int(i) for i in order] for order in orders]
+    nails_int = [(int(n[0]), int(n[1])) for n in nails]
+    colors_int = [(float(r), float(g), float(b)) for r, g, b in colors]
+    if thread_px is not None:
+        return _core.render_palette(orders_int, nails_int, colors_int, strengths,
+                                    in_w, in_h, w, h, white, float(thread_px))
+    return _core.render_palette(orders_int, nails_int, colors_int, strengths,
+                                in_w, in_h, w, h, white)

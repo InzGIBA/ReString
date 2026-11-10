@@ -6,7 +6,7 @@
 | Depends on | none (T-04's numbers refine the defaults later; not required) |
 | Unlocks | colored string art with buyable thread |
 | Size | L (a week or more) |
-| Status | [ ] not started |
+| Status | [x] done (601bf7b) |
 
 ## Why
 

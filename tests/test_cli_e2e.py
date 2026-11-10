@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pytest
 
@@ -170,6 +172,57 @@ def test_cli_anim_end_to_end(tmp_path, caplog):
 
     with pytest.raises(SystemExit):
         main(["-i", str(input_file), "-o", str(tmp_path / "out3.png"), "--anim", str(anim_file)])
+
+
+def test_cli_palette_cmyk(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "cmyk.png"), "-d", "40", "-l", "60",
+          "--palette", "cmyk"])
+    out = load_rgb(tmp_path / "cmyk.png")
+    assert out.shape == (40, 40, 3)
+    assert out.min() >= 0.0 and out.max() <= 1.0
+
+
+def test_cli_palette_file(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    palette_file = tmp_path / "dmc.json"
+    palette_file.write_text(json.dumps([
+        {"comment": "starter subset"},
+        {"name": "DMC 310 black", "rgb": [0.05, 0.05, 0.06]},
+        {"name": "DMC 415 pearl gray", "rgb": [0.71, 0.71, 0.7]},
+    ]))
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "dmc.png"), "-d", "40", "-l", "60",
+          "--palette", str(palette_file)])
+    assert (tmp_path / "dmc.png").exists()
+
+
+def test_cli_rgb_wins_over_palette(tmp_path, caplog):
+    import logging
+
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    with caplog.at_level(logging.INFO):
+        main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "60",
+              "--rgb", "--palette", "cmy"])
+    assert any("ignoring --palette" in r.message for r in caplog.records)
+
+
+def test_cli_palette_project_out_rejected(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    with pytest.raises(SystemExit):
+        main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "60",
+              "--palette", "cmyk", "--project-out", str(tmp_path / "p.restring")])
 
 
 def test_cli_realistic_thread_width(tmp_path, caplog):
