@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | less wasted thread, cleaner short-pull clutter |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (bdaab2b) |
 
 ## Why
 

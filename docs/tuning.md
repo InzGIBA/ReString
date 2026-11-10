@@ -13,6 +13,7 @@ Every CLI flag, measured on face-centered portrait fixtures (`tests/data/`). Eac
 | `-r` | 100 to 150 while exploring, drop the flag for the final run | k=100 saves 40 percent of the time for 15 percent error |
 | `-d` | 300 | exporting above the working grid hurts |
 | `--weight` | 3.0 for portraits, off for other subjects | center MSE falls 24 to 28 percent, global MSE rises 3 percent |
+| `--min-chord` | off | the greedy never picks short chords. Thresholds bite only past 230 px and cost up to 24 percent MSE |
 
 ## Thread count and export strength
 
@@ -83,6 +84,10 @@ A published rule from Birsak et al. says darker inputs approximate better. Measu
 `--weight <peak>` multiplies each pixel's error contribution by a Gaussian weight map centered on the image: peak at the center, 0.5 at the borders, sigma one third of the side length. Threads concentrate on the center and the periphery loses ink.
 
 Measured on both portrait fixtures at 2000 threads (`--rect`, `-s 0.05`): center MSE inside the central 50 percent box falls 24 to 28 percent, global MSE rises about 3 percent, scan time grows about 25 percent. Use `--weight 3` for portraits. Leave the flag off for subjects without a single center of interest: landscapes, groups, text. Full tables: [research/alternatives-experiment.md](research/alternatives-experiment.md).
+
+## Minimum chord
+
+`--min-chord <px>` bans candidate chords shorter than the distance in working-grid pixels. Measured on both portrait fixtures at 2000 threads (`--rect`, `-s 0.05`): the unfiltered greedy already avoids short pulls. The natural minimum chord sits at 229.5 px on the male fixture and 148 px on the female fixture. Thresholds up to 200 px leave the pull order untouched, and at 300 px global MSE rises 13 to 24 percent. Keep the flag off. Full curve and the chord distribution: [research/min-chord-experiment.md](research/min-chord-experiment.md).
 
 ## Presets
 

@@ -7,6 +7,8 @@ across runs). Every threshold was calibrated against the real pipeline — the
 measured value is noted next to each threshold, with a ~25-35% safety margin.
 """
 
+import math
+
 import numpy as np
 
 from _helpers import image_from_numpy, image_to_numpy, load_gray, load_rgb, save_image
@@ -203,3 +205,21 @@ def test_cli_weight_flag_concentrates_threads(tmp_path):
     bar = (R > 44) & (C > 40) & (C < 60)
     assert weighted[blob].mean() < plain[blob].mean()
     assert weighted[bar].mean() > plain[bar].mean() + 0.05
+
+
+def test_min_chord_removes_short_chords():
+    """min_chord must ban sub-threshold chords from the pull order. Fixture:
+    seeded noise on the 44-nail circle, threshold 40 px (the unfiltered
+    order reaches down to a 30.8 px chord, so the ban changes the sequence).
+    No dead ends occur on this layout, so every chord must clear the bar."""
+    rng = np.random.default_rng(5)
+    img = image_from_numpy(rng.random((64, 64, 3)))
+
+    _, plain_order = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=400))
+    _, filtered_order = generate_bw(img, SHAPE, NAILS, Config(side_len=64, pull_amount=400,
+                                                              min_chord=40.0))
+
+    assert filtered_order != plain_order
+    pts = [NAILS[j] for j in filtered_order]
+    for (r1, c1), (r2, c2) in zip(pts, pts[1:]):
+        assert math.hypot(r2 - r1, c2 - c1) >= 40.0

@@ -497,12 +497,57 @@ fn build_sources(nails: &[(i64, i64)], range: std::ops::Range<usize>, w: usize) 
     sources
 }
 
+/// Summed squared-error improvement of applying one cached line segment. An
+/// empty `weight_map` scores plain MSE; otherwise each pixel's contribution
+/// is scaled by the map value (importance weighting).
+#[inline]
+fn seg_improvement(
+    sl: &SourceLines,
+    pic: &[f64],
+    orig: &[f64],
+    weight_map: &[f64],
+    s0: usize,
+    s1: usize,
+    strength: f64,
+) -> f64 {
+    let mut improvement = 0.0f64;
+    if weight_map.is_empty() {
+        for k in s0..s1 {
+            let px = sl.flat_idx[k] as usize;
+            let cur = pic[px];
+            let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
+            let o = orig[px];
+            improvement += (cur - o) * (cur - o) - (new - o) * (new - o);
+        }
+    } else {
+        for k in s0..s1 {
+            let px = sl.flat_idx[k] as usize;
+            let cur = pic[px];
+            let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
+            let o = orig[px];
+            improvement += weight_map[px] * ((cur - o) * (cur - o) - (new - o) * (new - o));
+        }
+    }
+    improvement
+}
+
+/// Forward a debug note to the Python logging module (logger restring.core).
+fn log_debug(py: Python<'_>, msg: &str) {
+    let _ = py.import("logging").and_then(|log| {
+        let logger = log.call_method1("getLogger", ("restring.core",))?;
+        logger.call_method1("debug", (msg,))
+    });
+}
+
 /// Greedy pull-order search on the given grayscale target. Returns the pull
 /// order and the final working canvas. With `random_nails = Some(k)` only a
 /// fixed seeded subset of k candidates is scanned each iteration. With
 /// `weights = Some(map)` each pixel's error contribution is multiplied by the
 /// map value (the scan_candidates_weighted scoring), so threads concentrate
-/// on high-weight regions. Without weights the arithmetic is unchanged.
+/// on high-weight regions. Without weights the arithmetic is unchanged. With
+/// `min_chord = Some(d)` candidates closer than d pixels are skipped; on a
+/// dead end (every chord from the current nail is masked out) the search
+/// takes the best masked-out pull once instead of stalling.
 ///
 /// The line cache is rasterized in parallel (result-preserving: each line is
 /// deterministic, chunks are reassembled in source order).
@@ -511,8 +556,9 @@ fn build_sources(nails: &[(i64, i64)], range: std::ops::Range<usize>, w: usize) 
 /// docs/optimization.md (stage 7): with canvas-crossing chords the per-line
 /// invalidation fan-out rivals the full rescan cost, so the cache measured
 /// 0.4-0.6x of the plain scan throughput.
-#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, weights=None))]
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, weights=None, min_chord=None))]
 fn create_art(
+    py: Python<'_>,
     nails: Vec<(i64, i64)>,
     orig: &Image,
     strength: f64,
@@ -520,6 +566,7 @@ fn create_art(
     random_nails: Option<u64>,
     white: bool,
     weights: Option<&Image>,
+    min_chord: Option<f64>,
 ) -> PyResult<(Vec<u64>, Image)> {
     if orig.ch != 1 {
         return Err(PyValueError::new_err("create_art needs a grayscale target"));
@@ -566,11 +613,36 @@ fn create_art(
         sources.append(&mut chunk_sources);
     }
 
+    // per-source candidate masks: allowed[seg] keeps chords at or above the
+    // minimum distance. Distance in pixels, not nail indices, so the filter
+    // behaves the same on circle, rectangle and custom layouts.
+    let min_chord_sq = min_chord.map(|d| d * d);
+    let masks: Vec<Vec<bool>> = match min_chord_sq {
+        None => Vec::new(),
+        Some(mc2) => sources
+            .iter()
+            .enumerate()
+            .map(|(i, sl)| {
+                sl.targets
+                    .iter()
+                    .map(|&t| {
+                        let (dr, dc) = (
+                            (nails[t as usize].0 - nails[i].0) as f64,
+                            (nails[t as usize].1 - nails[i].1) as f64,
+                        );
+                        dr * dr + dc * dc >= mc2
+                    })
+                    .collect()
+            })
+            .collect(),
+    };
+
     let mut pic = vec![if white { 1.0 } else { 0.0 }; w * h];
     let mut pull_order: Vec<u64> = vec![0];
     let mut current = 0usize;
     let mut i = 0u64;
     let mut fails = 0u32;
+    let mut recovery_logged = false;
 
     loop {
         i += 1;
@@ -589,9 +661,14 @@ fn create_art(
         }
 
         let sl = &sources[current];
+        let allowed: &[bool] = if masks.is_empty() { &[] } else { &masks[current] };
         let mut best_target: u64 = 0;
         let mut best_improvement = f64::NEG_INFINITY;
         let mut best_range = (0usize, 0usize);
+        let mut fb_target: u64 = 0;
+        let mut fb_improvement = f64::NEG_INFINITY;
+        let mut fb_range = (0usize, 0usize);
+        let mut allowed_seen = false;
 
         for &cand in &order {
             if cand == current || cand >= n {
@@ -602,24 +679,17 @@ fn create_art(
                 Err(_) => continue,
             };
             let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
-            let mut improvement = 0.0f64;
-            if weight_map.is_empty() {
-                for k in s0..s1 {
-                    let px = sl.flat_idx[k] as usize;
-                    let cur = pic[px];
-                    let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
-                    let o = orig.data[px];
-                    improvement += (cur - o) * (cur - o) - (new - o) * (new - o);
+            let improvement = seg_improvement(sl, &pic, &orig.data, &weight_map, s0, s1, strength);
+            if !allowed.is_empty() && !allowed[seg] {
+                // masked out: rank it anyway, recovery may need it
+                if improvement > fb_improvement {
+                    fb_improvement = improvement;
+                    fb_target = cand as u64;
+                    fb_range = (s0, s1);
                 }
-            } else {
-                for k in s0..s1 {
-                    let px = sl.flat_idx[k] as usize;
-                    let cur = pic[px];
-                    let new = (cur + strength * sl.val[k]).clamp(0.0, 1.0);
-                    let o = orig.data[px];
-                    improvement += weight_map[px] * ((cur - o) * (cur - o) - (new - o) * (new - o));
-                }
+                continue;
             }
+            allowed_seen = true;
             if improvement >= best_improvement {
                 best_improvement = improvement;
                 best_target = cand as u64;
@@ -628,8 +698,18 @@ fn create_art(
         }
 
         if best_improvement <= 0.0 {
-            fails += 1;
-            continue;
+            if allowed_seen || fb_improvement <= 0.0 {
+                fails += 1;
+                continue;
+            }
+            // dead-end recovery: every chord from this nail sits under the
+            // threshold, take the best masked-out pull once instead of stalling
+            if !recovery_logged {
+                recovery_logged = true;
+                log_debug(py, "min-chord dead end: no candidate clears the threshold, taking the best masked-out pull");
+            }
+            best_target = fb_target;
+            best_range = fb_range;
         }
 
         pull_order.push(best_target);

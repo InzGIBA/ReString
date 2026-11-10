@@ -167,6 +167,27 @@ def test_gaussian_weights_values():
     assert abs(w.pixel(0, 0, 0) - expected) < 1e-12
 
 
+# Frozen minimum-chord order: same fixture as the full-scan golden, min_chord
+# 30 px (chords below 30 px are banned, dead ends recover via masked-out pulls), 400 iters.
+MIN_CHORD_ORDER = [0, 21, 2, 23, 42, 19, 43, 19, 37, 14, 38, 15, 34, 10, 32, 13, 35, 14, 38, 16,
+    40, 17, 39, 11, 30, 7, 36, 17, 33, 10, 28, 7, 26, 3, 24, 1, 26, 5, 28, 6, 26, 4, 30, 5, 25, 1,
+    22, 37, 20, 1, 17, 39, 14, 33, 11, 35, 8, 27, 3, 24, 0, 27, 3, 24, 37, 18, 40, 16, 43, 22, 6,
+    34, 7, 29, 9, 34, 15, 32, 6, 35, 14, 37, 23, 4, 29, 11, 39, 24, 1, 27, 12, 36, 7, 21, 5, 24,
+    13, 28, 8, 26, 40, 22, 2, 30, 4, 21, 34, 17, 41, 13, 0, 29, 6, 23, 36, 17, 1, 19, 7, 31, 9,
+    26, 42, 23, 8, 27, 2, 29, 15, 33, 4, 20, 43, 27, 12, 38, 11, 23, 36, 7, 21, 40, 24, 13, 40,
+    11, 41, 10, 32, 16, 37, 24, 42, 14, 31, 17, 3, 26, 40, 19, 35, 5, 18, 41, 14, 38, 22, 5, 31,
+    19, 8, 26, 4, 32, 19, 9, 23, 2, 34, 7, 29, 17, 33, 43, 30, 13, 2, 18, 33, 9, 36, 15, 37, 6,
+    25, 10, 28, 13, 0, 30, 2, 31, 12, 41, 25, 3, 16, 35, 24, 7, 19, 33, 22, 11, 37, 21, 10, 38, 9,
+    40, 8, 24, 13, 22, 37, 3, 29, 5, 26, 1, 34, 4, 15, 39, 20, 36, 23, 11, 27, 41, 10, 34, 21, 0,
+    26, 38, 16, 1, 13, 39, 6, 18, 42, 25, 34, 6, 27, 14, 43, 33, 16, 42, 28, 15, 35, 17, 7, 23,
+    31, 22, 13, 2, 35, 24, 11, 36, 22, 10, 37, 19, 31, 43, 8, 19, 28, 5, 23, 4, 39, 28, 12, 35, 3,
+    30, 17, 43, 15, 4, 18, 37, 27, 39, 8, 43, 32, 1, 30, 20, 10, 2, 11, 43, 13, 26, 40, 16, 26, 6,
+    21, 35, 7, 17, 31, 13, 22, 34, 0, 10, 30, 23, 41, 7, 26, 37, 3, 31, 23, 12, 36, 1, 23, 9, 24,
+    38, 28, 7, 40, 33, 7, 21, 13, 4, 29, 41, 15, 31, 20, 29, 17, 27, 3, 34, 13, 5, 18, 7, 37, 20,
+    9, 37, 0, 32, 23, 14, 26, 42, 11, 23, 30, 41, 19, 9, 0, 12, 3, 21, 33, 40, 32, 19, 39, 23, 30,
+    7, 40, 14, 22, 31, 1, 19, 27]
+
+
 def test_greedy_order_golden_full_scan():
     rng = np.random.default_rng(5)
     target = image_from_numpy(rng.random(SHAPE) * 0.8 + 0.1)
@@ -184,6 +205,37 @@ def test_greedy_order_golden_random_subset():
                           i_limit=300, random_nails=20)
 
     assert order == SUBSET_ORDER
+
+
+def test_greedy_order_golden_min_chord():
+    rng = np.random.default_rng(5)
+    target = image_from_numpy(rng.random(SHAPE) * 0.8 + 0.1)
+
+    order, _ = create_art(NAILS, target, init_canvas(SHAPE), -0.05, i_limit=400, min_chord=30.0)
+
+    assert order == MIN_CHORD_ORDER
+    # the threshold bites: the unfiltered golden contains a 21 px chord
+    assert order != FULL_ORDER
+    pts = [NAILS[j] for j in order]
+    for (r1, c1), (r2, c2) in zip(pts, pts[1:]):
+        assert math.hypot(r2 - r1, c2 - c1) >= 30.0
+
+
+def test_min_chord_dead_end_recovery(caplog):
+    # three corner nails, min_chord above the largest pairwise distance:
+    # every candidate is masked out, recovery must keep pulling
+    import logging
+
+    rng = np.random.default_rng(9)
+    target = image_from_numpy(rng.random(SHAPE) * 0.8 + 0.1)
+    sparse = [(0, 0), (0, 63), (63, 0)]  # pairwise distances 63, 63, 89
+
+    with caplog.at_level(logging.DEBUG):
+        order, _ = create_art(sparse, target, init_canvas(SHAPE), -0.05,
+                              i_limit=50, min_chord=100.0)
+
+    assert len(order) > 1  # a stalling search would return [0]
+    assert sum(1 for r in caplog.records if "dead end" in r.message) == 1
 
 
 def test_backend_is_deterministic():

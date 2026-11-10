@@ -19,9 +19,11 @@ class Config:
     radius2_multiplier: float = 1
     wb: bool = False
     weight_peak: float | None = None
+    min_chord: float | None = None
 
 
-def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, weights=None):
+def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, weights=None,
+               min_chord=None):
     """Greedy pull-order search on a grayscale target Image (Rust core).
 
     `pic` is only used for its initial fill (white/black canvas). Returns
@@ -29,7 +31,9 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
     seeded subset of k candidates is scanned each iteration (deterministic).
     With `weights` set to a grayscale Image of the target shape, each pixel's
     error contribution is multiplied by the weight value, so threads
-    concentrate on high-weight regions.
+    concentrate on high-weight regions. With `min_chord` set, candidates
+    closer than the distance in working-grid pixels are skipped; on a dead
+    end the search takes the best masked-out pull once and logs at DEBUG.
     """
     order, final = _core.create_art(
         [(int(r), int(c)) for r, c in nails],
@@ -39,6 +43,7 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
         int(random_nails) if random_nails is not None else None,
         pic.pixel(0, 0, 0) >= 0.5,
         weights,
+        float(min_chord) if min_chord is not None else None,
     )
     return [int(i) for i in order], final
 
@@ -52,7 +57,8 @@ def generate_rgb(img, shape, nails, config: Config):
         order, _ = create_art(nails, img.channel(channel),
                               init_canvas(shape, black=config.wb), strength,
                               i_limit=config.pull_amount,
-                              random_nails=config.random_nails)
+                              random_nails=config.random_nails,
+                              min_chord=config.min_chord)
         orders.append(order)
 
     max_pulls = max(len(o) for o in orders)
@@ -87,7 +93,7 @@ def generate_bw(img, shape, nails, config: Config):
     pull_order, _ = create_art(
         nails, target, init_canvas(shape, black=config.wb), strength,
         i_limit=config.pull_amount, random_nails=config.random_nails,
-        weights=weights,
+        weights=weights, min_chord=config.min_chord,
     )
 
     out_h = int(config.side_len * config.radius1_multiplier)

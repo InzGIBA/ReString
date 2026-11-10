@@ -42,7 +42,7 @@ needs a new hypothesis, not persistence.
 | # | Task | Target | Depends on | Size | Done |
 |---|---|---|---|---|---|
 | [01](01-importance-weight-flag.md) | `--weight` importance-weighting flag | Q1 · v1.2.0 | — | M | ✅ |
-| [02](02-min-chord-distance.md) | `--min-chord` minimum chord distance | Q1 · v1.2.0 | — | M |
+| [02](02-min-chord-distance.md) | `--min-chord` minimum chord distance | Q1 · v1.2.0 | — | M | ✅ |
 | [03](03-auto-export-strength.md) | Auto export strength (`-s` from pull count) | Q1 · v1.2.0 | — | M |
 | [04](04-rgb-channel-sweeps.md) | RGB per-channel sweeps (research) | Q1 · v1.2.0 | — | M |
 | [05](05-working-grid-scale.md) | Working grid above 300 px (research + flag) | Q1 · v1.2.0 | — | M |

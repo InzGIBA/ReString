@@ -1,8 +1,8 @@
 import numpy as np
 
 import restring
-from _helpers import image_from_numpy, image_to_numpy
-from restring.cli import build_parser
+from _helpers import image_from_numpy, image_to_numpy, save_image
+from restring.cli import build_parser, main
 from restring.generator import Config, generate_bw
 from restring.nails import create_circle_nail_positions
 
@@ -29,13 +29,14 @@ def test_parser_defaults():
     assert args.radius2_multiplier == 1
     assert args.nail_step == 4
     assert args.weight_peak is None
+    assert args.min_chord is None
     assert not (args.wb or args.rgb or args.rect)
 
 
 def test_parser_accepts_all_flags():
     argv = ["-i", "a.png", "-o", "b.png", "-d", "50", "-s", "0.2", "-l", "10",
             "-r", "7", "-r1", "1.2", "-r2", "0.8", "-n", "3", "--weight", "3",
-            "--wb", "--rgb", "--rect"]
+            "--min-chord", "20", "--wb", "--rgb", "--rect"]
 
     args = build_parser().parse_args(argv)
 
@@ -47,6 +48,7 @@ def test_parser_accepts_all_flags():
     assert (args.radius1_multiplier, args.radius2_multiplier) == (1.2, 0.8)
     assert args.nail_step == 3
     assert args.weight_peak == 3.0
+    assert args.min_chord == 20.0
     assert args.wb and args.rgb and args.rect
 
 
@@ -64,3 +66,15 @@ def test_generate_bw_smoke():
     assert arr.min() >= 0.0
     assert arr.max() <= 1.0
     assert len(pull_order) >= 2
+
+
+def test_cli_min_chord_smoke(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    output_file = tmp_path / "out.png"
+
+    main(["-i", str(input_file), "-o", str(output_file), "-d", "40", "-l", "30",
+          "--min-chord", "10"])
+
+    assert output_file.exists()

@@ -101,6 +101,7 @@ uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000 -s 0.05
 | `--rgb` | colored output with three interleaved threads | black and white |
 | `--wb` | white thread on a black canvas | black on white |
 | `--weight <float>` | importance weighting. A Gaussian weight map steers threads toward the image center, where the viewer looks. Suggested range 1.5 to 5.0. Portrait subjects only, about 25 percent more scan time | off |
+| `--min-chord <px>` | candidate filter: chords shorter than the distance in working-grid pixels are banned. Portrait measurement: the greedy never picks short chords, the filter only degrades MSE past 250 px. Intended for sparse custom layouts | off |
 
 Nails sit evenly on the perimeter. The circle starts at 9 o'clock and runs clockwise. The rectangle starts at the top left corner. The pull order is continuous by construction, so you wind one uncut thread.
 
@@ -134,6 +135,7 @@ The `-s` value matters more than any other flag. The working simulation darkens 
 | `-r` | 100 to 150 while exploring, drop for the final run | k=100 saves 40 percent of the time for 15 percent error |
 | `-d` | 300 | exporting above the working grid hurts |
 | `--weight` | 3.0 for portraits, off for other subjects | center MSE falls 24 to 28 percent, global MSE rises 3 percent |
+| `--min-chord` | off | the greedy never picks short chords, thresholds bite past 230 px at up to 24 percent MSE cost |
 
 Every flag, the numbers behind the rules and the degradation curves: [docs/tuning.md](docs/tuning.md).
 
