@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | T-09 (poster), T-10 (animation), batch rendering, API 2.0 |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (e7aad1b) |
 
 ## Why
 

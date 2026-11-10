@@ -101,8 +101,21 @@ restring -i portrait.png -o out.png --rect -n 2 -l 3000
 | `--wb` | white thread on a black canvas | black on white |
 | `--weight <float>` | importance weighting. A Gaussian weight map steers threads toward the image center, where the viewer looks. Suggested range 1.5 to 5.0. Portrait subjects only, about 25 percent more scan time | off |
 | `--min-chord <px>` | candidate filter: chords shorter than the distance in working-grid pixels are banned. Portrait measurement: the greedy never picks short chords, the filter only degrades MSE past 250 px. Intended for sparse custom layouts | off |
+| `--project-out <path>` | save the nail layout and pull order as a `.restring` project alongside the PNG | off |
+| `--project <path>` | re-render from a `.restring` project instead of an image: skips the search, applies the current `-s` and `-d` | off |
 
 Nails sit evenly on the perimeter. The circle starts at 9 o'clock and runs clockwise. The rectangle starts at the top left corner. The pull order is continuous by construction, so you wind one uncut thread.
+
+### Save and re-render
+
+The project file keeps the nail layout and the pull order in plain JSON, so a result re-renders in milliseconds without a search and any tool can read the winding sequence:
+
+```bash
+restring -i portrait.png -o out.png --rect -l 2000 --project-out result.restring
+restring --project result.restring -o out2.png   # byte-identical re-render
+```
+
+The current `-s` and `-d` apply at re-render time. Schema and compatibility promise: [docs/project-format.md](docs/project-format.md).
 
 ### As a library
 
