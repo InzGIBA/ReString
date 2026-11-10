@@ -1,0 +1,63 @@
+name: Bug report
+description: A run crashed, produced a broken render or diverged from a documented number
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ReString version
+      description: Output of `pip show restring` (Version line), or the git commit if built from source.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command line or script
+      description: The full command and every flag. Without it the report cannot be reproduced.
+      placeholder: "restring -i portrait.png -o out.png --rect -l 2000 --palette cmyk"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Actual behavior, including any error output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: Expected behavior, or a reference to the documented number that diverged.
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen
+      options:
+        - Always
+        - Sometimes
+        - Once
+    validations:
+      required: true
+  - type: textarea
+    id: image
+    attributes:
+      label: Input image (optional)
+      description: Attach the input photo if the report involves a render. Files under 10 MB attach directly.
+    validations:
+      required: false

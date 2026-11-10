@@ -186,6 +186,7 @@ Source checkouts prefix every command with `uv run`, for example `uv run restrin
 uv run pytest                   # 62 tests, ~6 s
 uv run ruff check .
 uv run python scripts/benchmark.py --label before   # or after, then --plot
+uv run python scripts/make_gallery.py               # regenerate docs/img/gallery.png
 ```
 
 CI runs the same checks on every push to main and every pull request, on linux, macos and windows (`.github/workflows/ci.yml`). A `v*` tag builds wheels for three platforms, publishes to PyPI and opens the GitHub Release (`.github/workflows/release.yml`).
@@ -207,7 +208,9 @@ CI runs the same checks on every push to main and every pull request, on linux, 
 
 ## Contributing
 
-Issues and pull requests are welcome. For larger changes, open an issue first to discuss the approach. For bug reports, include the input image, the exact command line, and the actual versus expected result.
+Issues and pull requests are welcome. Templates structure both: bug reports carry the command line and image, feature requests check the measured dead ends, research ideas state a pre-registered success bar, and the PR template asks for the measurement or test evidence.
+
+Wound a physical board? Post it under the "show and tell" label — the physical outputs are the project's best advertisement. The example gallery ([examples/gallery/](examples/gallery/)) shows the configuration families and the commands behind every tile.
 
 1. Describe the problem or the proposed improvement.
 2. Make a focused change.

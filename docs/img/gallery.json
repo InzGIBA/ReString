@@ -1,0 +1,98 @@
+[
+ {
+  "fixture": "male",
+  "config": "circle, 300 pulls",
+  "pulls_per_thread": [
+   300
+  ],
+  "nails": 211
+ },
+ {
+  "fixture": "male",
+  "config": "rect, 300 pulls",
+  "pulls_per_thread": [
+   300
+  ],
+  "nails": 300
+ },
+ {
+  "fixture": "male",
+  "config": "circle, 2000 pulls",
+  "pulls_per_thread": [
+   2000
+  ],
+  "nails": 211
+ },
+ {
+  "fixture": "male",
+  "config": "rect, 2000 pulls",
+  "pulls_per_thread": [
+   2000
+  ],
+  "nails": 300
+ },
+ {
+  "fixture": "male",
+  "config": "rect, 2000, weight 3",
+  "pulls_per_thread": [
+   2000
+  ],
+  "nails": 300
+ },
+ {
+  "fixture": "male",
+  "config": "star:5:0.55, exhaustion",
+  "pulls_per_thread": [
+   2986
+  ],
+  "nails": 1029
+ },
+ {
+  "fixture": "female",
+  "config": "circle, 300 pulls",
+  "pulls_per_thread": [
+   300
+  ],
+  "nails": 211
+ },
+ {
+  "fixture": "female",
+  "config": "rect, 300 pulls",
+  "pulls_per_thread": [
+   300
+  ],
+  "nails": 300
+ },
+ {
+  "fixture": "female",
+  "config": "circle, 2000 pulls",
+  "pulls_per_thread": [
+   2000
+  ],
+  "nails": 211
+ },
+ {
+  "fixture": "female",
+  "config": "rect, 2000 pulls",
+  "pulls_per_thread": [
+   2000
+  ],
+  "nails": 300
+ },
+ {
+  "fixture": "female",
+  "config": "rect, 2000, weight 3",
+  "pulls_per_thread": [
+   2000
+  ],
+  "nails": 300
+ },
+ {
+  "fixture": "female",
+  "config": "star:5:0.55, exhaustion",
+  "pulls_per_thread": [
+   3275
+  ],
+  "nails": 1029
+ }
+]

@@ -60,6 +60,6 @@ needs a new hypothesis, not persistence.
 | [17](17-multistart-research.md) | Multi-start greedy (research, likely negative) | Q3 · v1.4.0 | — | M | ✅ |
 | [18](18-wasm-browser-demo.md) | Core crate split + WASM browser demo | Q4 · v2.0.0 | — | L | ✅ |
 | [19](19-public-api-v2.md) | Public API 2.0 facade | Q4 · v2.0.0 | — (synergy with 08) | M | ✅ |
-| [20](20-gallery-community-files.md) | Issue templates, PR template, gallery | Q4 · v2.0.0 | — | S |
+| [20](20-gallery-community-files.md) | Issue templates, PR template, gallery | Q4 · v2.0.0 | — | S | ✅ |
 
 Size legend: S = under a day, M = 1–3 days, L = a week or more.

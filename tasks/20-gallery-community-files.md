@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | lower-friction contributions and issues that can be acted on |
 | Size | S (under a day) |
-| Status | [ ] not started |
+| Status | [x] done (3d3de42) |
 
 ## Why
 
