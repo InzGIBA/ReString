@@ -51,6 +51,7 @@ def build_parser():
                              "svg:file.svg[:count], with an optional @aspect suffix "
                              "(e.g. polygon:5@1.5) for non-square boards")
     parser.add_argument('--realistic', action="store_true")
+    parser.add_argument('--rollback', action="store_true")
     parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size",
                         default=None,
                         help="board size in mm: poster printing size (default 260), or the "
@@ -218,6 +219,7 @@ def main(argv=None):
         realistic=args.realistic,
         canvas_size=args.canvas_size if args.canvas_size is not None else 400,
         thread_width=args.thread_width,
+        rollback=args.rollback,
     )
 
     img = _core.Image.load(args.input_file)

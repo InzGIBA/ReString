@@ -1,0 +1,60 @@
+{
+ "male": [
+  {
+   "run": "budget_2000",
+   "pulls_full": 2000,
+   "pulls_rolled": 0,
+   "mse_full": 0.0291,
+   "mse_rollback": 0.0291,
+   "gain_percent": 0.0,
+   "order_is_prefix": true
+  },
+  {
+   "run": "budget_3000",
+   "pulls_full": 2670,
+   "pulls_rolled": 0,
+   "mse_full": 0.0185,
+   "mse_rollback": 0.0185,
+   "gain_percent": 0.0,
+   "order_is_prefix": true
+  },
+  {
+   "run": "exhaustion",
+   "pulls_full": 2670,
+   "pulls_rolled": 0,
+   "mse_full": 0.0185,
+   "mse_rollback": 0.0185,
+   "gain_percent": 0.0,
+   "order_is_prefix": true
+  }
+ ],
+ "female": [
+  {
+   "run": "budget_2000",
+   "pulls_full": 2000,
+   "pulls_rolled": 0,
+   "mse_full": 0.0303,
+   "mse_rollback": 0.0303,
+   "gain_percent": 0.0,
+   "order_is_prefix": true
+  },
+  {
+   "run": "budget_3000",
+   "pulls_full": 2513,
+   "pulls_rolled": 0,
+   "mse_full": 0.022,
+   "mse_rollback": 0.022,
+   "gain_percent": 0.0,
+   "order_is_prefix": true
+  },
+  {
+   "run": "exhaustion",
+   "pulls_full": 2513,
+   "pulls_rolled": 0,
+   "mse_full": 0.022,
+   "mse_rollback": 0.022,
+   "gain_percent": 0.0,
+   "order_is_prefix": true
+  }
+ ]
+}

@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | strictly-better outputs at the same budget |
 | Size | S (under a day) |
-| Status | [ ] not started |
+| Status | [x] done (3ee65a4) |
 
 ## Why
 

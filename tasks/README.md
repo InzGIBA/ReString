@@ -55,7 +55,7 @@ needs a new hypothesis, not persistence.
 | [12](12-thread-palette-system.md) | Thread palette system (CMYK, real floss) | Q2 · v1.3.0 | — | L | ✅ |
 | [13](13-custom-nail-layouts.md) | Custom nail layouts (polygon, star, rings, SVG) | Q3 · v1.4.0 | — | M | ✅ |
 | [14](14-adaptive-nail-placement.md) | Adaptive nail placement (research) | Q3 · v1.4.0 | — (synergy with 13) | M | ✅ |
-| [15](15-best-prefix-rollback.md) | Best-prefix rollback on stagnation | Q3 · v1.4.0 | — | S |
+| [15](15-best-prefix-rollback.md) | Best-prefix rollback on stagnation | Q3 · v1.4.0 | — | S | ✅ |
 | [16](16-blurred-ssim-metric.md) | Blurred SSIM + `--metrics` report | Q3 · v1.4.0 | — | S |
 | [17](17-multistart-research.md) | Multi-start greedy (research, likely negative) | Q3 · v1.4.0 | — | M |
 | [18](18-wasm-browser-demo.md) | Core crate split + WASM browser demo | Q4 · v2.0.0 | — | L |

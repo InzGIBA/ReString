@@ -539,6 +539,13 @@ fn log_debug(py: Python<'_>, msg: &str) {
     });
 }
 
+fn log_info(py: Python<'_>, msg: &str) {
+    let _ = py.import("logging").and_then(|log| {
+        let logger = log.call_method1("getLogger", ("restring.core",))?;
+        logger.call_method1("info", (msg,))
+    });
+}
+
 /// Greedy pull-order search on the given grayscale target. Returns the pull
 /// order and the final working canvas. With `random_nails = Some(k)` only a
 /// fixed seeded subset of k candidates is scanned each iteration. With
@@ -547,7 +554,10 @@ fn log_debug(py: Python<'_>, msg: &str) {
 /// on high-weight regions. Without weights the arithmetic is unchanged. With
 /// `min_chord = Some(d)` candidates closer than d pixels are skipped; on a
 /// dead end (every chord from the current nail is masked out) the search
-/// takes the best masked-out pull once instead of stalling.
+/// takes the best masked-out pull once instead of stalling. With
+/// `rollback = true` the returned order truncates to the prefix where the
+/// running canvas error hit its minimum — zero and negative improvement
+/// tails vanish. Default false: the full order, bit-identical to v1.1.
 ///
 /// The line cache is rasterized in parallel (result-preserving: each line is
 /// deterministic, chunks are reassembled in source order).
@@ -556,7 +566,7 @@ fn log_debug(py: Python<'_>, msg: &str) {
 /// docs/optimization.md (stage 7): with canvas-crossing chords the per-line
 /// invalidation fan-out rivals the full rescan cost, so the cache measured
 /// 0.4-0.6x of the plain scan throughput.
-#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, weights=None, min_chord=None))]
+#[pyfunction(signature = (nails, orig, strength, i_limit=None, random_nails=None, white=true, weights=None, min_chord=None, rollback=false))]
 fn create_art(
     py: Python<'_>,
     nails: Vec<(i64, i64)>,
@@ -567,6 +577,7 @@ fn create_art(
     white: bool,
     weights: Option<&Image>,
     min_chord: Option<f64>,
+    rollback: bool,
 ) -> PyResult<(Vec<u64>, Image)> {
     if orig.ch != 1 {
         return Err(PyValueError::new_err("create_art needs a grayscale target"));
@@ -644,6 +655,18 @@ fn create_art(
     let mut fails = 0u32;
     let mut recovery_logged = false;
 
+    // best-prefix tracking: the blank canvas error minus the improvements of
+    // every applied pull telescopes into the true canvas error, so the
+    // minimum marks the best prefix exactly
+    let initial_fill = if white { 1.0 } else { 0.0 };
+    let mut running_error: f64 = orig
+        .data
+        .iter()
+        .map(|o| (initial_fill - o) * (initial_fill - o))
+        .sum();
+    let mut best_error = running_error;
+    let mut best_len = 0usize;
+
     loop {
         i += 1;
 
@@ -710,14 +733,25 @@ fn create_art(
             }
             best_target = fb_target;
             best_range = fb_range;
+            best_improvement = fb_improvement;
         }
 
         pull_order.push(best_target);
+        running_error -= best_improvement;
         for k in best_range.0..best_range.1 {
             let px = sl.flat_idx[k] as usize;
             pic[px] = (pic[px] + strength * sl.val[k]).clamp(0.0, 1.0);
         }
         current = best_target as usize;
+        if running_error < best_error {
+            best_error = running_error;
+            best_len = pull_order.len() - 1;
+        }
+    }
+
+    if rollback && pull_order.len() - 1 > best_len {
+        log_info(py, &format!("Rolled back {} of {} pulls", pull_order.len() - 1 - best_len, pull_order.len() - 1));
+        pull_order.truncate(best_len + 1);
     }
 
     Ok((pull_order, Image { data: pic, w, h, ch: 1 }))

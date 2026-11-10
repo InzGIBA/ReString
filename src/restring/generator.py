@@ -41,6 +41,7 @@ class Config:
     realistic: bool = False
     canvas_size: float = 400
     thread_width: float = 0.2
+    rollback: bool = False
 
 
 def _thread_px(config: Config, side_len: int):
@@ -59,7 +60,7 @@ def _thread_px(config: Config, side_len: int):
 
 
 def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, weights=None,
-               min_chord=None):
+               min_chord=None, rollback=False):
     """Greedy pull-order search on a grayscale target Image (Rust core).
 
     `pic` is only used for its initial fill (white/black canvas). Returns
@@ -70,6 +71,8 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
     concentrate on high-weight regions. With `min_chord` set, candidates
     closer than the distance in working-grid pixels are skipped; on a dead
     end the search takes the best masked-out pull once and logs at DEBUG.
+    With `rollback` set, a stagnating or exhausted run truncates to the
+    prefix where the canvas error hit its minimum (logged at INFO).
     """
     order, final = _core.create_art(
         [(int(r), int(c)) for r, c in nails],
@@ -80,6 +83,7 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
         pic.pixel(0, 0, 0) >= 0.5,
         weights,
         float(min_chord) if min_chord is not None else None,
+        bool(rollback),
     )
     return [int(i) for i in order], final
 
@@ -117,7 +121,8 @@ def generate_palette(img, shape, nails, config: Config, threads):
                               init_canvas(shape, black=config.wb), strength,
                               i_limit=config.pull_amount,
                               random_nails=config.random_nails,
-                              min_chord=config.min_chord)
+                              min_chord=config.min_chord,
+                              rollback=config.rollback)
         orders.append(order)
         magnitude = config.export_strength
         if magnitude is None:
@@ -163,6 +168,7 @@ def generate_bw(img, shape, nails, config: Config):
         nails, target, init_canvas(shape, black=config.wb), strength,
         i_limit=config.pull_amount, random_nails=config.random_nails,
         weights=weights, min_chord=config.min_chord,
+        rollback=config.rollback,
     )
 
     out_h = int(config.side_len * config.radius1_multiplier)

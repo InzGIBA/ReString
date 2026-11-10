@@ -341,6 +341,20 @@ def test_backend_is_deterministic():
     assert order_a == order_b
 
 
+def test_rollback_prefix_never_worse():
+    # stagnation exit (no i_limit): the search runs into failing pulls; with
+    # rollback the order truncates to the best prefix and its canvas error is
+    # at most the full order's
+    rng = np.random.default_rng(5)
+    target = image_from_numpy(rng.random(SHAPE) * 0.8 + 0.1)
+    full, final_full = create_art(NAILS, target, init_canvas(SHAPE), -0.05)
+    short, final_short = create_art(NAILS, target, init_canvas(SHAPE), -0.05, rollback=True)
+
+    assert len(short) <= len(full)
+    assert short == full[: len(short)]  # the truncated order is a prefix
+    assert _core.mse(final_short, target) <= _core.mse(final_full, target) + 1e-12
+
+
 def test_circle_nails_semantics():
     nails = _core.circle_nails(64, 64, 4, 1, 1)
     all_nails = _core.circle_nails(64, 64, 1, 1, 1)
