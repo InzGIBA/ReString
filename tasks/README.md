@@ -47,7 +47,7 @@ needs a new hypothesis, not persistence.
 | [04](04-rgb-channel-sweeps.md) | RGB per-channel sweeps (research) | Q1 · v1.2.0 | — | M | ✅ |
 | [05](05-working-grid-scale.md) | Working grid above 300 px (research + flag) | Q1 · v1.2.0 | — | M | ✅ |
 | [06](06-ci-test-workflow.md) | CI: test workflow, three OSes | Q1 · v1.2.0 | — | S | ✅ |
-| [07](07-pypi-release-wheels.md) | PyPI wheels + tag release workflow | Q1 · v1.2.0 | 06 | M |
+| [07](07-pypi-release-wheels.md) | PyPI wheels + tag release workflow | Q1 · v1.2.0 | 06 | M | ✅ |
 | [08](08-pull-order-project-format.md) | `.restring` project format + order export | Q2 · v1.3.0 | — | M |
 | [09](09-winding-poster-svg.md) | Winding poster SVG + thread length | Q2 · v1.3.0 | 08 | M |
 | [10](10-winding-animation-gif.md) | Winding animation GIF | Q2 · v1.3.0 | 08 | M |

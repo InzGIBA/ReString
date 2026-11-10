@@ -8,3 +8,4 @@ One line per finished or blocked task, newest at the bottom.
 04. done. c23debf. RGB research: working strength 0.05 adopted (13 to 17 percent better MSE on both fixtures), variance budgets and exhaustion rejected, RGB order golden added. tests 62 passed.
 05. done. 970c295. Working grid research: keep 300, gains under 3 percent at up to 2.4x time; large-grid wins at strength 0.1 reproduce saturation from mistuned strength. tests 62 passed.
 06. done. 0eeb200. CI workflow: three-OS matrix (linux, macos, windows), ruff plus pytest, 15 minute timeout. YAML validated locally, the live run is untested until the next push. tests 62 passed.
+07. done. 5600c85. Release workflow builds abi3 wheels for five targets plus sdist on a v* tag, publishes via trusted publishing, opens the GitHub Release; requires-python relaxes to 3.12, version sync check in CI. The publish step is untested (no PyPI trusted publisher from this environment). tests 62 passed.

@@ -6,7 +6,7 @@
 | Depends on | T-06 (CI workflow exists; release job reuses its steps) |
 | Unlocks | `pip install restring` — removes the Rust-toolchain barrier |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (5600c85) |
 
 ## Why
 

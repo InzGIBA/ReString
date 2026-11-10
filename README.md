@@ -44,21 +44,18 @@ The project started as a 2020 university course assignment by Kaspar Valk, Kert 
 
 ## Quick start
 
-### Requirements
-
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) and a Rust toolchain with a C linker for cargo. uv fetches Python 3.14 and compiles the core on first sync.
-- No system C compiler (minimal WSL or container)? Use zig as the cargo linker — the recipe lives in [docs/architecture.md](docs/architecture.md#build).
-
 ### Install
 
 ```bash
-uv sync
+pip install restring
 ```
+
+Wheels cover linux (x86_64, aarch64), macos (x86_64, arm64) and windows (x86_64) on CPython 3.12 and newer. No Rust toolchain needed. Building from source needs uv and Rust, see [Development](#development).
 
 ### Run your first example
 
 ```bash
-uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000   # best quality, ~1.4 s
+restring -i portrait.png -o out.png --rect -n 2 -l 3000   # best quality, ~1.4 s
 ```
 
 Expected result:
@@ -77,13 +74,13 @@ Three presets cover most jobs (timed on a 24-core Linux box):
 
 ```bash
 # fast preview, ~0.3 s
-uv run restring -i portrait.png -o out.png --rect -l 300
+restring -i portrait.png -o out.png --rect -l 300
 
 # balanced, ~0.6 s
-uv run restring -i portrait.png -o out.png --rect -n 4 -l 2000
+restring -i portrait.png -o out.png --rect -n 4 -l 2000
 
 # maximum measured quality, ~1.4 s
-uv run restring -i portrait.png -o out.png --rect -n 2 -l 3000
+restring -i portrait.png -o out.png --rect -n 2 -l 3000
 ```
 
 ### CLI reference
@@ -149,6 +146,10 @@ cd ReString
 uv sync
 ```
 
+Requirements: [uv](https://docs.astral.sh/uv/getting-started/installation/) and a Rust toolchain with a C linker for cargo. uv fetches Python 3.14 and compiles the core on first sync. No system C compiler (minimal WSL or container)? Use zig as the cargo linker — the recipe lives in [docs/architecture.md](docs/architecture.md#build).
+
+Source checkouts prefix every command with `uv run`, for example `uv run restring -i portrait.png -o out.png --rect -l 300`.
+
 ### Checks
 
 ```bash
@@ -157,7 +158,7 @@ uv run ruff check .
 uv run python scripts/benchmark.py --label before   # or after, then --plot
 ```
 
-CI runs the same checks on every push to main and every pull request, on linux, macos and windows (`.github/workflows/ci.yml`).
+CI runs the same checks on every push to main and every pull request, on linux, macos and windows (`.github/workflows/ci.yml`). A `v*` tag builds wheels for three platforms, publishes to PyPI and opens the GitHub Release (`.github/workflows/release.yml`).
 
 ## Documentation
 

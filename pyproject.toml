@@ -9,7 +9,9 @@ authors = [
 ]
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.14"
+# abi3-py312 in rust/Cargo.toml: one wheel serves CPython 3.12 and newer;
+# development runs on 3.14 (.python-version) and CI tests that version
+requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
