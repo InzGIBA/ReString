@@ -215,6 +215,37 @@ def test_cli_rgb_wins_over_palette(tmp_path, caplog):
     assert any("ignoring --palette" in r.message for r in caplog.records)
 
 
+def test_cli_metrics_report(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    metrics_file = tmp_path / "metrics.json"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "40",
+          "--metrics", str(metrics_file)])
+
+    report = json.loads(metrics_file.read_text())
+    assert report["pulls"] >= 1
+    assert report["nails"] >= 3
+    assert 0.0 <= report["mse"] <= 1.0
+    assert -1.0 <= report["corr"] <= 1.0
+    assert 0.0 <= report["ssim"] <= 1.0
+    assert 0.0 <= report["blurred_ssim"] <= 1.0
+
+
+def test_cli_metrics_rejected_for_project(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "40",
+          "--project-out", str(project_file)])
+
+    with pytest.raises(SystemExit):
+        main(["--project", str(project_file), "-o", str(tmp_path / "out2.png"),
+              "--metrics", str(tmp_path / "m.json")])
+
+
 def test_cli_layout_specs(tmp_path):
     from pathlib import Path
 

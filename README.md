@@ -109,6 +109,7 @@ restring -i portrait.png -o out.png --rect -n 2 -l 3000
 | `--anim <path>` | with `--project`: animated GIF of the winding sequence. `--anim-frames` sets the frame count, 180 is about 6 s at 30 fps. A 2000-pull project at the default 600 px export lands near 45 MB; `-d 450` brings it to about 28 MB, `-d 380` under 25 MB | off |
 | `--realistic` | physical thread model: threads of `--thread-width` mm (default 0.2) on a `--canvas-size` mm board (default 400). At exports well above 300 px the 0.3 mm width beats the hairline by 35 percent MSE. The search never changes | hairline |
 | `--rollback` | truncate a stagnating run to its best-error prefix. Measured no-op: the search never applies non-improving pulls, so nothing rolls back ([measurement](docs/research/rollback-experiment.md)) | off |
+| `--metrics <path.json>` | write a quality report: MSE, correlation, plain and blurred SSIM against the working target, plus pulls, nails and elapsed time. Generate mode only | off |
 | `--thread-width <mm>` | thread diameter for `--realistic`. Birsak used 0.15, typical polyester sits near 0.2 | 0.2 |
 | `--canvas-size <mm>` | board size: the poster printing size (default 260 for `--poster`) or the physical size behind `--realistic` (default 400) | per feature |
 

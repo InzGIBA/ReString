@@ -1,6 +1,8 @@
 import argparse
 import hashlib
+import json
 import logging
+import time
 from pathlib import Path
 
 from restring import _core, layouts, palettes
@@ -52,6 +54,10 @@ def build_parser():
                              "(e.g. polygon:5@1.5) for non-square boards")
     parser.add_argument('--realistic', action="store_true")
     parser.add_argument('--rollback', action="store_true")
+    parser.add_argument('--metrics', action="store", dest="metrics", default=None,
+                        help="write a quality report JSON (MSE, correlation, plain and "
+                             "blurred SSIM of the render against the working target); "
+                             "generate mode only")
     parser.add_argument('--canvas-size', action="store", type=float, dest="canvas_size",
                         default=None,
                         help="board size in mm: poster printing size (default 260), or the "
@@ -187,6 +193,9 @@ def main(argv=None):
     if not args.project and not args.input_file:
         parser.error("either -i or --project is required")
 
+    if args.metrics and args.project:
+        parser.error("--metrics needs -i: the working target is unknown for --project runs")
+
     if args.project:
         proj = load_project(args.project)
         if args.rgb and proj.mode != "rgb":
@@ -245,6 +254,7 @@ def main(argv=None):
 
     layout_label = args.layout or ("rect" if args.rect else "circle")
     logger.info(f"Nails amount: {len(nails)}")
+    run_started = time.perf_counter()
 
     threads = None
     if args.rgb:
@@ -297,6 +307,27 @@ def main(argv=None):
             write_poster(proj, args)
 
     result.save_png(args.output_file)
+
+    if args.metrics:
+        out_h, out_w = result.shape()[:2]
+        target_resized = resize(img, (out_h, out_w))
+        target_gray = target_resized.gray(1.0)
+        render_gray = result if mode == "bw" else result.gray(1.0)
+        report = {
+            "mode": mode,
+            "pulls": max(len(o) - 1 for o in orders),
+            "nails": len(nails),
+            "export": [out_h, out_w],
+            "elapsed_s": round(time.perf_counter() - run_started, 2),
+            "mse": round(_core.mse(render_gray, target_gray), 4),
+            "corr": round(_core.corr(render_gray, target_gray), 4),
+            "ssim": round(_core.ssim(render_gray, target_gray), 4),
+            "blurred_ssim": round(_core.ssim_blur(render_gray, target_gray, 2), 4),
+        }
+        Path(args.metrics).write_text(json.dumps(report, indent=1))
+        logger.info(f"Metrics: mse={report['mse']} corr={report['corr']} "
+                    f"ssim={report['ssim']} blurred_ssim={report['blurred_ssim']} "
+                    f"pulls={report['pulls']} in {report['elapsed_s']}s -> {args.metrics}")
 
 
 if __name__ == '__main__':

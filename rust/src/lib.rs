@@ -35,6 +35,61 @@ impl Image {
 
 #[pymethods]
 impl Image {
+    /// Separable box blur with a (2*radius+1) window: two passes over
+    /// running sums, O(w*h) regardless of radius, edges replicate. Works on
+    /// grayscale and per-channel color.
+    fn box_blur(&self, radius: usize) -> Image {
+        let (w, h, ch) = (self.w, self.h, self.ch);
+        let r = radius.min(w.max(h));
+        let mut tmp = vec![0.0f64; self.data.len()];
+        let mut out = vec![0.0f64; self.data.len()];
+        // horizontal pass: sliding [c - r, c + r] window with clamped edges
+        for row in 0..h {
+            for k in 0..ch {
+                let at = |c: usize| self.data[(row * w + c) * ch + k];
+                let mut lo: i64 = 0;
+                let mut hi: i64 = -1;
+                let mut running = 0.0f64;
+                for c in 0..w {
+                    let want_hi = (c + r).min(w - 1) as i64;
+                    while hi < want_hi {
+                        hi += 1;
+                        running += at(hi as usize);
+                    }
+                    let want_lo = (c as i64 - r as i64).max(0);
+                    while lo < want_lo {
+                        running -= at(lo as usize);
+                        lo += 1;
+                    }
+                    tmp[(row * w + c) * ch + k] = running / (hi - lo + 1) as f64;
+                }
+            }
+        }
+        // vertical pass over the horizontal result
+        for c in 0..w {
+            for k in 0..ch {
+                let at = |rr: usize| tmp[(rr * w + c) * ch + k];
+                let mut lo: i64 = 0;
+                let mut hi: i64 = -1;
+                let mut running = 0.0f64;
+                for row in 0..h {
+                    let want_hi = (row + r).min(h - 1) as i64;
+                    while hi < want_hi {
+                        hi += 1;
+                        running += at(hi as usize);
+                    }
+                    let want_lo = (row as i64 - r as i64).max(0);
+                    while lo < want_lo {
+                        running -= at(lo as usize);
+                        lo += 1;
+                    }
+                    out[(row * w + c) * ch + k] = running / (hi - lo + 1) as f64;
+                }
+            }
+        }
+        Image { data: out, w, h, ch }
+    }
+
     /// Load a PNG/JPEG file as an RGB float image in [0, 1].
     #[staticmethod]
     fn load(path: String) -> PyResult<Self> {
@@ -1551,6 +1606,15 @@ fn mse(a: &Image, b: &Image) -> PyResult<f64> {
     Ok(a.data.iter().zip(&b.data).map(|(x, y)| (x - y) * (x - y)).sum::<f64>() / a.data.len() as f64)
 }
 
+/// SSIM after a box blur on both images: thin dark lines on white defeat
+/// plain SSIM's local statistics; the blur restores them (T-16, see
+/// docs/research/pull-count-quality.md). Grayscale input required.
+#[pyfunction]
+fn ssim_blur(a: &Image, b: &Image, radius: usize) -> PyResult<f64> {
+    same_shape(a, b)?;
+    ssim(&a.box_blur(radius), &b.box_blur(radius))
+}
+
 #[pyfunction]
 fn corr(a: &Image, b: &Image) -> PyResult<f64> {
     same_shape(a, b)?;
@@ -2021,6 +2085,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(save_gif, m)?)?;
     m.add_function(wrap_pyfunction!(thick_line, m)?)?;
     m.add_function(wrap_pyfunction!(gradient_magnitude, m)?)?;
+    m.add_function(wrap_pyfunction!(ssim_blur, m)?)?;
     m.add_function(wrap_pyfunction!(render_bw_thick, m)?)?;
     m.add_function(wrap_pyfunction!(render_rgb_thick, m)?)?;
     m.add_function(wrap_pyfunction!(mse, m)?)?;

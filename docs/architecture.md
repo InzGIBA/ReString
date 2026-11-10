@@ -52,6 +52,10 @@ Three guarantees, all enforced by the test suite on every run:
 
 The equivalence chain behind the goldens: the Rust rasterizer matched the Python port pixel for pixel, and the Python port matched skimage byte for byte. The pull orders matched the former numpy implementation 2862 out of 2862 on a 7000-iteration run. Those reference implementations are gone now. The goldens carry the guarantee forward.
 
+## Metrics
+
+Quality reports use two windowed statistics plus MSE and correlation. Plain SSIM misbehaves on thread renders: thin anti-aliased lines on white defeat the local statistics, so it peaks at 50 threads and falls while the picture improves (`docs/research/pull-count-quality.md`). The fix is a box blur before the comparison — `Image.box_blur(radius)` (separable, running sums, O(w*h)) followed by the windowed SSIM, exposed as `_core.ssim_blur`. Measured on both portrait fixtures at export strength 0.05: blurred SSIM rises monotonically along the pull series (0.60 to 0.67 on the male fixture) exactly where plain SSIM falls (0.56 to 0.30). `--metrics out.json` writes the four numbers plus pull count, nails and elapsed time after any generate run; the monotonicity property lives in `tests/test_e2e_quality.py`.
+
 ## Performance
 
 Measured on an AMD 24-core Linux box, 300 x 300 working grid, 211 nails, portrait fixture. Reproduce with `uv run python scripts/benchmark.py`.

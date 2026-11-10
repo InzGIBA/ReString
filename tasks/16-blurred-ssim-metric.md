@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | honest acceptance metrics; user-facing quality numbers |
 | Size | S (under a day) |
-| Status | [ ] not started |
+| Status | [x] done (d3c4801) |
 
 ## Why
 

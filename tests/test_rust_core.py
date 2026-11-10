@@ -108,6 +108,34 @@ def test_gradient_magnitude_hand_computed():
     assert np.allclose(mag, [[4.0, 8.0, 8.0, 8.0, 4.0]] * 5)
 
 
+def test_box_blur_hand_computed():
+    # single bright pixel at (1, 2) in a 3x7 grid, radius 1, separable
+    # passes: the horizontal pass row 1 reads [0, 3, 3, 3, 0, 0, 0] (the
+    # windows at columns 1..3 each contain the 9), then the vertical pass
+    # spreads it with clamped edges
+    grid = [[0.0] * 7 for _ in range(3)]
+    grid[1][2] = 9.0
+    blurred = image_to_numpy(_core.Image.from_nested(grid).box_blur(1))
+    assert blurred.shape == (3, 7)
+    expected = [
+        [0.0, 1.5, 1.5, 1.5, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.5, 1.5, 1.5, 0.0, 0.0, 0.0],
+    ]
+    assert np.allclose(blurred, expected)
+
+
+def test_box_blur_leaves_constant_images_unchanged():
+    flat = image_from_numpy([[0.37] * 9 for _ in range(9)])
+    blurred = image_to_numpy(_core.Image.from_nested([[0.37] * 9 for _ in range(9)]).box_blur(3))
+    assert np.allclose(blurred, image_to_numpy(flat), atol=1e-12)
+
+
+def test_ssim_blur_identity():
+    img = image_from_numpy([[float(c) / 6.0 for c in range(7)] for _ in range(7)])
+    assert _core.ssim_blur(img, img, 2) == pytest.approx(1.0)
+
+
 @pytest.mark.parametrize("golden", LINE_AA_CHECKSUMS)
 def test_line_aa_golden_checksums(golden):
     seg, count, first, last, ink = golden

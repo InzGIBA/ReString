@@ -8,15 +8,17 @@ measured value is noted next to each threshold, with a ~25-35% safety margin.
 """
 
 import math
+from pathlib import Path
 
 import numpy as np
 
 from _helpers import image_from_numpy, image_to_numpy, load_gray, load_rgb, save_image
+from restring import _core
 from restring.canvas import init_canvas, pull_order_to_array_bw
 from restring.cli import main
 from restring.generator import Config, generate_bw, generate_rgb
-from restring.image_transformations import rgb2gray
-from restring.metrics import ssim
+from restring.image_transformations import largest_square, resize, rgb2gray
+from restring.metrics import blurred_ssim, ssim
 from restring.nails import create_circle_nail_positions
 
 SHAPE = (64, 64)
@@ -73,6 +75,10 @@ def test_bw_reduces_error_vs_blank():
 
     blank_mse = mse(np.ones(SHAPE), target)  # measured: 0.081
     assert mse(image_to_numpy(result), target) <= 0.45 * blank_mse  # measured: 0.027
+    # blurred SSIM gate alongside the MSE assert (measured: 0.5716; a blank
+    # canvas scores higher on this sparse fixture, so the threshold tracks
+    # the render, not the blank — the monotonicity test covers the regime)
+    assert blurred_ssim(result, image_from_numpy(target)) >= 0.45
 
 
 def test_bw_beats_random_baseline():
@@ -220,6 +226,37 @@ def test_cli_weight_flag_concentrates_threads(tmp_path):
     bar = (R > 44) & (C > 40) & (C < 60)
     assert weighted[blob].mean() < plain[blob].mean()
     assert weighted[bar].mean() > plain[bar].mean() + 0.05
+
+
+def test_blurred_ssim_monotone_where_plain_is_not():
+    """The pull-count study documents plain SSIM peaking at low budgets and
+    falling while the picture improves (docs/research/pull-count-quality.md):
+    thin anti-aliased lines defeat the local statistics. The blurred variant
+    must track real quality: monotone non-decreasing along the pull series in
+    the honest regime (export strength 0.05 equals the working strength, no
+    overshoot). Measured: blurred rises 0.60 to 0.67 on both fixtures while
+    plain falls 0.55 to 0.30."""
+    photo = Path(__file__).parent / "data" / "portrait_female.png"
+    ref_img = resize(largest_square(_core.Image.load(str(photo))), (300, 300))
+    target = ref_img.gray(0.9)
+    nails = create_circle_nail_positions((300, 300), nail_step=4)
+
+    _, order = generate_bw(ref_img, (300, 300), nails,
+                           Config(side_len=300, pull_amount=3000, export_strength=0.05))
+    total = len(order) - 1
+    budgets = [50, 100, 300, 1000, total]
+
+    plain, blurred = [], []
+    for budget in budgets:
+        render = pull_order_to_array_bw(order[: budget + 1], init_canvas((300, 300)),
+                                        nails, -0.05)
+        plain.append(ssim(render, target))
+        blurred.append(blurred_ssim(render, target))
+
+    tolerance = 0.005
+    for earlier, later in zip(blurred, blurred[1:]):
+        assert later >= earlier - tolerance, f"blurred SSIM dropped: {earlier:.4f} -> {later:.4f}"
+    assert plain[0] > plain[-1]  # the documented misbehavior, still present
 
 
 def test_min_chord_removes_short_chords():
