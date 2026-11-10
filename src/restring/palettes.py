@@ -93,4 +93,7 @@ def resolve_palette(spec):
     """A palette spec is a built-in name or a path to a JSON palette file."""
     if spec in _builtin_threads():
         return builtin_palette(spec)
+    if not Path(spec).is_file():
+        raise PaletteError(
+            f"unknown palette {spec!r}: not a built-in name and no file at that path")
     return load_palette(spec)
