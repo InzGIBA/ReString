@@ -1224,6 +1224,42 @@ fn save_gif(path: String, images: Vec<PyRef<'_, Image>>, fps: u16) -> PyResult<u
     Ok(images.len())
 }
 
+/// Sobel gradient magnitude (grayscale; color images collapse through the
+/// standard luminance weights first). Exposed for placement analysis and
+/// future tasks; pure f64 convolution with clamped edges.
+#[pyfunction]
+fn gradient_magnitude(img: &Image) -> Image {
+    let (w, h) = (img.w, img.h);
+    let gray: Vec<f64> = if img.ch == 1 {
+        img.data.clone()
+    } else {
+        img.data
+            .chunks_exact(3)
+            .map(|px| 0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2])
+            .collect()
+    };
+    const KX: [[f64; 3]; 3] = [[-1.0, 0.0, 1.0], [-2.0, 0.0, 2.0], [-1.0, 0.0, 1.0]];
+    const KY: [[f64; 3]; 3] = [[-1.0, -2.0, -1.0], [0.0, 0.0, 0.0], [1.0, 2.0, 1.0]];
+    let mut mag = vec![0.0; w * h];
+    for r in 0..h {
+        for c in 0..w {
+            let mut gx = 0.0f64;
+            let mut gy = 0.0f64;
+            for dr in 0..3 {
+                for dc in 0..3 {
+                    let rr = (r as i64 + dr as i64 - 1).clamp(0, h as i64 - 1) as usize;
+                    let cc = (c as i64 + dc as i64 - 1).clamp(0, w as i64 - 1) as usize;
+                    let v = gray[rr * w + cc];
+                    gx += KX[dr][dc] * v;
+                    gy += KY[dr][dc] * v;
+                }
+            }
+            mag[r * w + c] = (gx * gx + gy * gy).sqrt();
+        }
+    }
+    Image { data: mag, w, h, ch: 1 }
+}
+
 /// One anti-aliased thick segment. Pixel centers sit at integer coordinates
 /// (the convention zingl_line draws with); coverage = clamp(1 - (distance to
 /// segment - half_width), 0, 1), a 1-px linear falloff in the same spirit as
@@ -1950,6 +1986,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(animate_rgb, m)?)?;
     m.add_function(wrap_pyfunction!(save_gif, m)?)?;
     m.add_function(wrap_pyfunction!(thick_line, m)?)?;
+    m.add_function(wrap_pyfunction!(gradient_magnitude, m)?)?;
     m.add_function(wrap_pyfunction!(render_bw_thick, m)?)?;
     m.add_function(wrap_pyfunction!(render_rgb_thick, m)?)?;
     m.add_function(wrap_pyfunction!(mse, m)?)?;

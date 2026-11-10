@@ -6,7 +6,7 @@
 | Depends on | none (composes nicely with T-13's layouts, but runs on circle/rect alone) |
 | Unlocks | better quality at equal nail hardware |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (1730cd5) |
 
 ## Why
 

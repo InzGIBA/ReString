@@ -100,6 +100,14 @@ def test_thick_line_golden_exact(golden):
     assert np.allclose(got_cov, cov, atol=1e-11)
 
 
+def test_gradient_magnitude_hand_computed():
+    # horizontal ramp value = column: the interior Sobel response is
+    # Gx = -4 * (c-1) + 4 * (c+1) = 8, edge pixels clamp to half (4)
+    ramp = image_from_numpy([[float(c) for c in range(5)] for _ in range(5)])
+    mag = image_to_numpy(_core.gradient_magnitude(ramp))
+    assert np.allclose(mag, [[4.0, 8.0, 8.0, 8.0, 4.0]] * 5)
+
+
 @pytest.mark.parametrize("golden", LINE_AA_CHECKSUMS)
 def test_line_aa_golden_checksums(golden):
     seg, count, first, last, ink = golden
