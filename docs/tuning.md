@@ -107,6 +107,10 @@ uv run restring -i face.png -o out.png --rect -n 2 -l 3000
 uv run restring -i face.png -o out.png --rect -n 2 -l 3000
 ```
 
+## RGB
+
+The RGB pipeline inherits the layout, nail step and budget findings mechanically. Its own sweep (docs/research/rgb-channels-experiment.md) fixed the working strength at 0.05, down from 0.1: global color MSE improves 13 to 17 percent on both fixtures and channels stop saturating before the budget. Variance-proportional budgets and exhaustion stopping measured worse or neutral and stand rejected. Export stays auto per channel.
+
 ## Limits
 
-RGB sweeps were not re-run. RGB inherits the layout and budget findings mechanically, but per-channel thresholds were never measured. The working grid above 300 was not tested either. Both are open experiments.
+The working grid above 300 was not tested. That remains an open experiment.

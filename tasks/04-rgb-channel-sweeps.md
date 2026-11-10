@@ -6,7 +6,7 @@
 | Depends on | none |
 | Unlocks | evidence-based RGB defaults; input for T-12 palette work |
 | Size | M (1–3 days) |
-| Status | [ ] not started |
+| Status | [x] done (c23debf) |
 
 ## Why
 

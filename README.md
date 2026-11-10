@@ -167,7 +167,7 @@ uv run python scripts/benchmark.py --label before   # or after, then --plot
 
 ## Roadmap
 
-- [ ] Re-run the RGB sweeps — per-channel thresholds were never measured.
+- [x] Re-run the RGB sweeps — working strength 0.05 adopted, 13 to 17 percent better MSE ([measurement](docs/research/rgb-channels-experiment.md)).
 - [ ] Test the working grid above 300 px.
 
 ## Contributing

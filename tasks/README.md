@@ -44,7 +44,7 @@ needs a new hypothesis, not persistence.
 | [01](01-importance-weight-flag.md) | `--weight` importance-weighting flag | Q1 · v1.2.0 | — | M | ✅ |
 | [02](02-min-chord-distance.md) | `--min-chord` minimum chord distance | Q1 · v1.2.0 | — | M | ✅ |
 | [03](03-auto-export-strength.md) | Auto export strength (`-s` from pull count) | Q1 · v1.2.0 | — | M | ✅ |
-| [04](04-rgb-channel-sweeps.md) | RGB per-channel sweeps (research) | Q1 · v1.2.0 | — | M |
+| [04](04-rgb-channel-sweeps.md) | RGB per-channel sweeps (research) | Q1 · v1.2.0 | — | M | ✅ |
 | [05](05-working-grid-scale.md) | Working grid above 300 px (research + flag) | Q1 · v1.2.0 | — | M |
 | [06](06-ci-test-workflow.md) | CI: test workflow, three OSes | Q1 · v1.2.0 | — | S |
 | [07](07-pypi-release-wheels.md) | PyPI wheels + tag release workflow | Q1 · v1.2.0 | 06 | M |

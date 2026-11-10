@@ -1,0 +1,370 @@
+{
+ "male": {
+  "variances": [
+   0.0996,
+   0.094,
+   0.0837
+  ],
+  "rows": [
+   {
+    "config": "work0.03",
+    "work": 0.03,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     2000,
+     2000,
+     2000
+    ],
+    "pad_share": 0.0,
+    "time_s": 1.22,
+    "global_mse": 0.0339,
+    "channel_mse": [
+     0.0376,
+     0.0334,
+     0.0306
+    ],
+    "ssim": 0.3279
+   },
+   {
+    "config": "work0.05",
+    "work": 0.05,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     2000,
+     2000,
+     2000
+    ],
+    "pad_share": 0.0,
+    "time_s": 1.23,
+    "global_mse": 0.0269,
+    "channel_mse": [
+     0.03,
+     0.0272,
+     0.0234
+    ],
+    "ssim": 0.3095
+   },
+   {
+    "config": "work0.1",
+    "work": 0.1,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     1175,
+     1196,
+     1099
+    ],
+    "pad_share": 0.0329,
+    "time_s": 1.16,
+    "global_mse": 0.0325,
+    "channel_mse": [
+     0.0355,
+     0.0328,
+     0.0293
+    ],
+    "ssim": 0.2306
+   },
+   {
+    "config": "work0.15",
+    "work": 0.15,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     746,
+     789,
+     741
+    ],
+    "pad_share": 0.0384,
+    "time_s": 1.13,
+    "global_mse": 0.0391,
+    "channel_mse": [
+     0.0418,
+     0.0392,
+     0.0363
+    ],
+    "ssim": 0.1786
+   },
+   {
+    "config": "budget_var",
+    "work": 0.1,
+    "budgets": [
+     719,
+     678,
+     604
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     719,
+     678,
+     604
+    ],
+    "pad_share": 0.0722,
+    "time_s": 0.5,
+    "global_mse": 0.0458,
+    "channel_mse": [
+     0.0466,
+     0.0453,
+     0.0455
+    ],
+    "ssim": 0.2077
+   },
+   {
+    "config": "stop_exhaust",
+    "work": 0.1,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "exhaustion",
+    "export": "auto",
+    "pulls_per_channel": [
+     1175,
+     1196,
+     1099
+    ],
+    "pad_share": 0.0329,
+    "time_s": 0.75,
+    "global_mse": 0.0325,
+    "channel_mse": [
+     0.0355,
+     0.0328,
+     0.0293
+    ],
+    "ssim": 0.2306
+   },
+   {
+    "config": "export_fixed",
+    "work": 0.1,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "fixed",
+    "pulls_per_channel": [
+     1175,
+     1196,
+     1099
+    ],
+    "pad_share": 0.0329,
+    "time_s": null,
+    "global_mse": 0.0322,
+    "channel_mse": [
+     0.035,
+     0.032,
+     0.0295
+    ],
+    "ssim": 0.2073
+   }
+  ]
+ },
+ "female": {
+  "variances": [
+   0.0964,
+   0.1253,
+   0.1533
+  ],
+  "rows": [
+   {
+    "config": "work0.03",
+    "work": 0.03,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     2000,
+     2000,
+     2000
+    ],
+    "pad_share": 0.0,
+    "time_s": 1.23,
+    "global_mse": 0.0435,
+    "channel_mse": [
+     0.0342,
+     0.0414,
+     0.0549
+    ],
+    "ssim": 0.3721
+   },
+   {
+    "config": "work0.05",
+    "work": 0.05,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     1969,
+     2000,
+     2000
+    ],
+    "pad_share": 0.0052,
+    "time_s": 1.24,
+    "global_mse": 0.0368,
+    "channel_mse": [
+     0.0273,
+     0.0348,
+     0.0484
+    ],
+    "ssim": 0.357
+   },
+   {
+    "config": "work0.1",
+    "work": 0.1,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     944,
+     1155,
+     1336
+    ],
+    "pad_share": 0.1429,
+    "time_s": 1.18,
+    "global_mse": 0.0424,
+    "channel_mse": [
+     0.0354,
+     0.0397,
+     0.0522
+    ],
+    "ssim": 0.2721
+   },
+   {
+    "config": "work0.15",
+    "work": 0.15,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     629,
+     781,
+     922
+    ],
+    "pad_share": 0.1567,
+    "time_s": 1.15,
+    "global_mse": 0.048,
+    "channel_mse": [
+     0.0425,
+     0.0451,
+     0.0565
+    ],
+    "ssim": 0.228
+   },
+   {
+    "config": "budget_var",
+    "work": 0.1,
+    "budgets": [
+     514,
+     668,
+     818
+    ],
+    "stop": "budgeted",
+    "export": "auto",
+    "pulls_per_channel": [
+     514,
+     668,
+     818
+    ],
+    "pad_share": 0.1848,
+    "time_s": 0.5,
+    "global_mse": 0.0551,
+    "channel_mse": [
+     0.0529,
+     0.0521,
+     0.0601
+    ],
+    "ssim": 0.2631
+   },
+   {
+    "config": "stop_exhaust",
+    "work": 0.1,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "exhaustion",
+    "export": "auto",
+    "pulls_per_channel": [
+     944,
+     1155,
+     1336
+    ],
+    "pad_share": 0.1429,
+    "time_s": 0.75,
+    "global_mse": 0.0424,
+    "channel_mse": [
+     0.0354,
+     0.0397,
+     0.0522
+    ],
+    "ssim": 0.2721
+   },
+   {
+    "config": "export_fixed",
+    "work": 0.1,
+    "budgets": [
+     2000,
+     2000,
+     2000
+    ],
+    "stop": "budgeted",
+    "export": "fixed",
+    "pulls_per_channel": [
+     944,
+     1155,
+     1336
+    ],
+    "pad_share": 0.1429,
+    "time_s": null,
+    "global_mse": 0.0385,
+    "channel_mse": [
+     0.0331,
+     0.039,
+     0.0433
+    ],
+    "ssim": 0.2615
+   }
+  ]
+ }
+}

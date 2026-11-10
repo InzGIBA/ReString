@@ -67,7 +67,10 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
 
 
 def generate_rgb(img, shape, nails, config: Config):
-    strength = 0.1 if config.wb else -0.1
+    # measured working strength 0.05: global color MSE improves 13 to 17
+    # percent over the old 0.1 on both portrait fixtures and grayscale SSIM
+    # rises (docs/research/rgb-channels-experiment.md)
+    strength = 0.05 if config.wb else -0.05
 
     # one greedy run per channel on a shared nail grid
     orders = []

@@ -16,7 +16,7 @@ import pytest
 from _helpers import image_from_numpy, image_to_numpy
 from restring import _core
 from restring.canvas import init_canvas, line_aa, pull_order_to_array_bw
-from restring.generator import create_art
+from restring.generator import Config, create_art, generate_rgb
 from restring.nails import create_circle_nail_positions
 
 pytestmark = pytest.mark.skipif(_core is None, reason="Rust core not built")
@@ -186,6 +186,44 @@ MIN_CHORD_ORDER = [0, 21, 2, 23, 42, 19, 43, 19, 37, 14, 38, 15, 34, 10, 32, 13,
     38, 28, 7, 40, 33, 7, 21, 13, 4, 29, 41, 15, 31, 20, 29, 17, 27, 3, 34, 13, 5, 18, 7, 37, 20,
     9, 37, 0, 32, 23, 14, 26, 42, 11, 23, 30, 41, 19, 9, 0, 12, 3, 21, 33, 40, 32, 19, 39, 23, 30,
     7, 40, 14, 22, 31, 1, 19, 27]
+
+
+# Frozen RGB channel orders: seeded noise target, 44 circle nails, working
+# strength 0.05 (docs/research/rgb-channels-experiment.md), 150 iters per
+# channel, auto export. Padded to the longest channel.
+RGB_ORDERS_GOLDEN = [
+    [0, 17, 2, 23, 1, 20, 5, 26, 4, 30, 7, 30, 8, 31, 12, 38, 16, 37, 12, 33, 11, 35, 11, 32, 14,
+     31, 12, 30, 7, 26, 2, 18, 42, 26, 5, 22, 6, 29, 6, 32, 5, 20, 38, 15, 36, 8, 29, 11, 27, 10,
+     28, 43, 23, 40, 24, 1, 23, 2, 21, 39, 15, 36, 12, 34, 9, 31, 16, 41, 19, 39, 21, 3, 23, 43,
+     28, 10, 38, 12, 31, 8, 33, 15, 37, 13, 34, 18, 2, 17, 43, 25, 0, 16, 35, 8, 25, 7, 27, 9, 22,
+     6, 24, 38, 17, 0, 26, 40, 20, 4, 32, 19, 42, 16, 1, 29, 13, 31, 4, 32, 7, 28, 8, 36, 18, 0,
+     24, 41, 11, 32, 5, 22, 9, 39, 15, 29, 6, 35, 21, 37, 19, 4, 36, 21, 1, 30, 14, 42, 26, 4, 21,
+     39, 10],
+    [0, 26, 3, 23, 3, 27, 5, 24, 3, 27, 7, 28, 5, 25, 4, 26, 2, 21, 42, 19, 42, 15, 32, 13, 36,
+     10, 30, 10, 37, 12, 35, 12, 31, 9, 29, 9, 32, 16, 40, 23, 38, 17, 1, 18, 0, 28, 3, 19, 4, 31,
+     11, 32, 16, 34, 13, 39, 12, 37, 18, 36, 14, 37, 9, 33, 17, 1, 22, 43, 24, 41, 21, 1, 18, 34,
+     15, 30, 7, 23, 40, 21, 2, 33, 6, 31, 9, 27, 10, 38, 17, 1, 22, 43, 26, 0, 24, 8, 28, 12, 27,
+     4, 20, 41, 23, 38, 14, 33, 7, 31, 4, 19, 34, 3, 34, 12, 25, 42, 16, 36, 10, 35, 18, 0, 27,
+     12, 40, 16, 1, 12, 42, 9, 30, 2, 20, 33, 20, 39, 13, 37, 6, 27, 10, 43, 28, 15, 32, 13, 29,
+     42, 21, 37, 11],
+    [0, 21, 39, 18, 39, 16, 40, 17, 39, 21, 4, 24, 3, 21, 38, 19, 2, 26, 5, 22, 1, 27, 10, 34, 12,
+     35, 15, 37, 18, 43, 23, 42, 20, 5, 25, 42, 16, 3, 32, 6, 29, 11, 26, 43, 15, 35, 13, 33, 7,
+     28, 0, 19, 4, 28, 5, 31, 7, 30, 13, 36, 10, 30, 2, 31, 13, 33, 7, 22, 38, 12, 28, 11, 39, 14,
+     38, 16, 3, 24, 41, 25, 1, 19, 38, 15, 36, 9, 37, 7, 22, 5, 20, 4, 30, 8, 33, 14, 42, 23, 40,
+     27, 6, 22, 0, 12, 29, 11, 36, 8, 25, 9, 31, 2, 26, 11, 39, 21, 3, 32, 10, 40, 24, 0, 28, 42,
+     20, 7, 28, 42, 17, 39, 18, 1, 16, 30, 15, 43, 29, 2, 15, 31, 1, 22, 38, 8, 26, 9, 34, 14, 3,
+     27, 40]
+]
+
+
+def test_rgb_orders_golden():
+    rng = np.random.default_rng(5)
+    img = image_from_numpy(rng.random((64, 64, 3)))
+
+    _, orders = generate_rgb(img, SHAPE, NAILS, Config(side_len=64, pull_amount=150))
+
+    assert orders == RGB_ORDERS_GOLDEN
+    assert len(orders[0]) == len(orders[1]) == len(orders[2])  # padded to the max
 
 
 def test_greedy_order_golden_full_scan():
