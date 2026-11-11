@@ -51,7 +51,7 @@ The project started as a 2020 university course assignment by Kaspar Valk, Kert 
 ### Install
 
 ```bash
-pip install restring
+pip install restring-art
 ```
 
 Wheels cover linux (x86_64, aarch64), macos (x86_64, arm64) and windows (x86_64) on CPython 3.12 and newer. No Rust toolchain needed. Building from source needs uv and Rust, see [Development](#development).

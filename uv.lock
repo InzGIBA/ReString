@@ -543,7 +543,7 @@ wheels = [
 ]
 
 [[package]]
-name = "restring"
+name = "restring-art"
 version = "2.0.0"
 source = { editable = "." }
 
