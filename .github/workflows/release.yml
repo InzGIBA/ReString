@@ -65,6 +65,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      # PyPI sanitizes the description: no <picture>, no SVG, no relative
+      # paths. The repo README keeps the GitHub rendering.
+      - name: Make the long description PyPI-safe
+        shell: bash
+        run: python3 scripts/build_pypi_readme.py README.md README.md || python scripts/build_pypi_readme.py README.md README.md
+
       # abi3-py312: one wheel per platform covers CPython 3.12 and newer
       - uses: PyO3/maturin-action@v1
         with:
@@ -83,6 +89,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Make the long description PyPI-safe
+        run: python3 scripts/build_pypi_readme.py README.md README.md
       - uses: PyO3/maturin-action@v1
         with:
           command: sdist

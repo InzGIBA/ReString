@@ -283,14 +283,14 @@ dependencies = [
 
 [[package]]
 name = "restring-core-algo"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "image",
 ]
 
 [[package]]
 name = "restring-pyo3"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "pyo3",
  "restring-core-algo",
