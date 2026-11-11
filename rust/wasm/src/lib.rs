@@ -20,12 +20,14 @@ pub struct WasmImage {
     inner: core::Image,
 }
 
-/// A finished search: pull order, nail layout and the working canvas.
+/// A finished search: pull order, nail layout and the export strength the
+/// render uses.
 #[wasm_bindgen]
 pub struct WasmArt {
     order: Vec<u64>,
     nails: Vec<(i64, i64)>,
     pulls: usize,
+    export_strength: f64,
 }
 
 #[wasm_bindgen]
@@ -57,11 +59,14 @@ pub fn load_image(bytes: &[u8]) -> Result<WasmImage, JsError> {
     Ok(WasmImage { inner: resized })
 }
 
-/// Run the greedy search. `layout` is "rect" or "circle". The 10_000
-/// budget is a cap, not a cost: the search stops on stagnation near
-/// saturation, so long budgets add quality first and time second.
-/// `weight` (Some) concentrates threads toward the center via the
-/// Gaussian map.
+/// Run the greedy search. `layout` is "rect" or "circle". The working
+/// strength is the measured 0.05 constant, like the CLI. `strength`
+/// drives the render: None (or 0) fits the export strength from the
+/// actual pull count, the fitted 104/L rule clamped to 0.03..0.3; a
+/// value applies as given. The 10_000 budget is a cap, not a cost: at
+/// working 0.05 saturation sits near 2900 pulls, and the search stops
+/// on stagnation past it. `weight` (Some) concentrates threads toward
+/// the center via the Gaussian map.
 #[wasm_bindgen]
 pub fn generate(
     image: &WasmImage,
@@ -77,12 +82,17 @@ pub fn generate(
         "rect" => core::rect_nails(GRID, GRID, nail_step),
         _ => core::circle_nails(GRID, GRID, nail_step, 1.0, 1.0),
     };
-    let strength = if strength.abs() < 1e-9 { -0.1 } else { -strength.abs() };
+    let working_strength = -0.05;
+    let export_strength = match strength {
+        Some(s) if s.abs() > 1e-9 => -s.abs().clamp(0.03, 0.3),
+        // the fitted auto rule, same as the CLI default
+        _ => -(104.0 / pulls.max(1) as f64).clamp(0.03, 0.3),
+    };
     let weights = weight.map(|peak| core::gaussian_weights(GRID, GRID, GRID as f64 / 3.0, peak, 0.5));
     let (order, _final) = core::create_art(
         nails.clone(),
         &image.inner.gray(0.9).map_err(to_js_error)?,
-        strength,
+        working_strength,
         Some(pulls as u64),
         None,
         true,
@@ -93,7 +103,7 @@ pub fn generate(
         None,
     )
     .map_err(to_js_error)?;
-    Ok(WasmArt { pulls: order.len() - 1, nails, order })
+    Ok(WasmArt { pulls: order.len() - 1, nails, order, export_strength })
 }
 
 /// Render the art to PNG bytes at the given square size.
@@ -102,7 +112,7 @@ pub fn render_png(art: &WasmArt, size_px: usize) -> Result<Vec<u8>, JsError> {
     let rendered = core::render_bw(
         art.order.clone(),
         art.nails.clone(),
-        -0.1,
+        art.export_strength,
         GRID,
         GRID,
         size_px,

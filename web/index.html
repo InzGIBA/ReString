@@ -174,8 +174,8 @@
     <div class="field"><span>nail step <output id="step-label">4</output></span>
       <input id="step" type="range" min="2" max="8" step="1" value="4">
     </div>
-    <div class="field"><span>thread strength <output id="strength-label">0.10</output></span>
-      <input id="strength" type="range" min="0.05" max="0.2" step="0.01" value="0.10">
+    <div class="field"><span>thread strength <output id="strength-label">auto</output></span>
+      <input id="strength" type="range" min="0" max="0.2" step="0.01" value="0">
     </div>
     <div class="field"><span>center weight <output id="weight-label">off</output></span>
       <input id="weight" type="range" min="0" max="3" step="0.5" value="0">
@@ -272,11 +272,15 @@ drop.addEventListener('drop', e => {
   if (e.dataTransfer.files.length) readPhoto(e.dataTransfer.files[0]);
 });
 
-for (const id of ['pulls', 'step', 'strength']) {
+for (const id of ['pulls', 'step']) {
   document.getElementById(id).addEventListener('input', e => {
     document.getElementById(id + '-label').textContent = e.target.value;
   });
 }
+document.getElementById('strength').addEventListener('input', e => {
+  document.getElementById('strength-label').textContent =
+    Number(e.target.value) === 0 ? 'auto' : e.target.value;
+});
 document.getElementById('weight').addEventListener('input', e => {
   document.getElementById('weight-label').textContent =
     Number(e.target.value) === 0 ? 'off' : e.target.value;
@@ -309,7 +313,7 @@ renderBtn.addEventListener('click', () => {
   setTimeout(() => {
     try {
       const t0 = performance.now();
-      const art = generate(photo, layout, step, pulls, strength, weight > 0 ? weight : null);
+      const art = generate(photo, layout, step, pulls, strength > 0 ? strength : null, weight > 0 ? weight : null);
       const png = render_png(art, 600);
       const blob = new Blob([png], { type: 'image/png' });
       const ctx = canvas.getContext('2d');
