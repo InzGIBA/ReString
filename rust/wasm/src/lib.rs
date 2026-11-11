@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 use restring_core as core;
 
 const GRID: usize = 300;
-const MAX_PULLS: usize = 1000;
+const MAX_PULLS: usize = 10_000;
 
 fn to_js_error(message: String) -> JsError {
     JsError::new(&message)
@@ -57,9 +57,11 @@ pub fn load_image(bytes: &[u8]) -> Result<WasmImage, JsError> {
     Ok(WasmImage { inner: resized })
 }
 
-/// Run the greedy search. `layout` is "rect" or "circle"; pulls cap at 1000
-/// for browser responsiveness. `weight` (Some) concentrates threads toward
-/// the center via the Gaussian map.
+/// Run the greedy search. `layout` is "rect" or "circle". The 10_000
+/// budget is a cap, not a cost: the search stops on stagnation near
+/// saturation, so long budgets add quality first and time second.
+/// `weight` (Some) concentrates threads toward the center via the
+/// Gaussian map.
 #[wasm_bindgen]
 pub fn generate(
     image: &WasmImage,

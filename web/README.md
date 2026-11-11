@@ -10,7 +10,7 @@ file plus the wasm module the build produces.
   renderers). The browser uses the same algorithms as the Python package.
 - `rust/wasm/` — the wasm-bindgen binding: `load_image` (decode + square
   crop + resample to the 300 px working grid), `generate` (greedy search,
-  pulls capped at 1000 for responsiveness, optional center-weight map) and
+  pulls capped at 10_000, optional center-weight map) and
   `render_png` (PNG bytes for the canvas and the download link).
 - `index.html` — vanilla JS: drag-drop file input, sliders, canvas preview,
   PNG download. State lives in memory; photos never leave the machine.
@@ -20,7 +20,7 @@ file plus the wasm module the build produces.
 
 Serial everywhere: the core's thread-parallel line cache has a serial
 fallback on wasm (`std::thread::scope` is unavailable on
-wasm32-unknown-unknown). A 1000-pull search on the 300 px grid is a few
+wasm32-unknown-unknown). A 3000-pull search on the 300 px grid is a few
 seconds on a mid-range laptop.
 
 ## Build
