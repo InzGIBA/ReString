@@ -1,5 +1,3 @@
-[![CI](https://github.com/InzGIBA/ReString/actions/workflows/ci.yml/badge.svg)](https://github.com/InzGIBA/ReString/actions/workflows/ci.yml)
-
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="assets/hero-light.svg">
