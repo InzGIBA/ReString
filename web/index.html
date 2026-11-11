@@ -320,8 +320,9 @@ renderBtn.addEventListener('click', () => {
       download.href = URL.createObjectURL(blob);
       download.hidden = false;
       const seconds = ((performance.now() - t0) / 1000).toFixed(1);
-      document.getElementById('stat-pulls').textContent = art.pulls();
-      document.getElementById('stat-nails').textContent = art.nails_count();
+      // getter bindings surface as JS properties, not methods
+      document.getElementById('stat-pulls').textContent = art.pulls;
+      document.getElementById('stat-nails').textContent = art.nails_count;
       document.getElementById('stat-time').textContent = seconds;
       stats.classList.add('ready');
       setStatus('done. wind it for real with the restring CLI.');

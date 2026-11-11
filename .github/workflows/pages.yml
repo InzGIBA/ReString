@@ -32,6 +32,12 @@ jobs:
         run: cargo install wasm-pack --locked
       - name: Build the wasm module
         run: wasm-pack build rust/wasm --target web --out-dir ../../web/pkg
+      # run the binding in Node before shipping: catches getter/method
+      # contract bugs and render breakage the compiler cannot see
+      - name: Smoke the wasm binding
+        run: |
+          cp web/pkg/restring_wasm.js web/pkg/restring_wasm.mjs
+          node scripts/wasm_smoke.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
