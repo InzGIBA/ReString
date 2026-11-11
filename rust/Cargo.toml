@@ -14,7 +14,9 @@ name = "restring_core"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.23", features = ["abi3-py312"] }
+# extension-module: resolve Python symbols at runtime, so the manylinux
+# wheel builds never link against libpython
+pyo3 = { version = "0.23", features = ["abi3-py312", "extension-module"] }
 restring-core-algo = { path = "core" }
 
 [profile.release]
