@@ -14,6 +14,9 @@ file plus the wasm module the build produces.
   `render_png` (PNG bytes for the canvas and the download link).
 - `index.html` — vanilla JS: drag-drop file input, sliders, canvas preview,
   PNG download. State lives in memory; photos never leave the machine.
+  Styled after the smui Nord theme: Source Code Pro monospace, zero
+  radius, surface-0..3 hierarchy, dark and light modes plus five runtime
+  accent colors, all persisted in localStorage.
 
 Serial everywhere: the core's thread-parallel line cache has a serial
 fallback on wasm (`std::thread::scope` is unavailable on

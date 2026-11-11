@@ -1,52 +1,205 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ReString playground</title>
+<title>restring playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
-  h1 { font-size: 1.4rem; }
-  #drop { border: 2px dashed gray; border-radius: 8px; padding: 2rem; text-align: center; cursor: pointer; }
-  #drop.hover { border-color: royalblue; }
-  label { display: block; margin: 0.6rem 0 0.2rem; }
-  button { margin-top: 1rem; padding: 0.5rem 1.2rem; font-size: 1rem; }
-  #status { min-height: 1.4em; color: gray; }
-  canvas { max-width: 100%; margin-top: 1rem; border: 1px solid gray; image-rendering: auto; }
-  a { color: royalblue; }
+  /* smui: terminal-aesthetic Nord theme. Polar Night / Snow Storm, frost
+     accents, surface-0..3 hierarchy, zero radius, monospace everywhere. */
+  :root, [data-theme="light"] {
+    color-scheme: light;
+    --surface-0: hsl(218 27% 94%);
+    --surface-1: hsl(218 27% 89%);
+    --surface-2: hsl(219 28% 84%);
+    --surface-3: hsl(219 20% 76%);
+    --fg: hsl(220 16% 22%);
+    --fg-muted: hsl(220 17% 28%);
+    --border: hsl(219 18% 72%);
+    --border-hover: hsl(220 17% 50%);
+    --primary-fg: hsl(0 0% 100%);
+    --danger: hsl(355 60% 45%);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: hsl(213 16% 12%);
+    --surface-1: hsl(217 16% 15.5%);
+    --surface-2: hsl(216 15% 19%);
+    --surface-3: hsl(215 14% 22%);
+    --fg: hsl(213 27% 88%);
+    --fg-muted: hsl(213 14% 65%);
+    --border: hsl(217 17% 28%);
+    --border-hover: hsl(216 12% 37%);
+    --primary-fg: hsl(213 16% 12%);
+    --danger: hsl(355 52% 65%);
+  }
+  /* runtime accent switching, five picks from the frost/aurora palette */
+  [data-accent="frost"]  { --primary: hsl(193 44% 67%); --primary-dim: hsl(193 40% 38%); }
+  [data-accent="steel"]  { --primary: hsl(210 34% 63%); --primary-dim: hsl(210 34% 40%); }
+  [data-accent="red"]    { --primary: hsl(355 52% 64%); --primary-dim: hsl(355 55% 44%); }
+  [data-accent="green"]  { --primary: hsl(92 28% 65%);  --primary-dim: hsl(92 35% 34%); }
+  [data-accent="purple"] { --primary: hsl(311 24% 63%); --primary-dim: hsl(311 28% 40%); }
+  [data-theme="light"][data-accent="frost"]  { --primary: hsl(193 40% 38%); --primary-dim: hsl(193 44% 67%); }
+  [data-theme="light"][data-accent="steel"]  { --primary: hsl(210 34% 40%); --primary-dim: hsl(210 34% 63%); }
+  [data-theme="light"][data-accent="red"]    { --primary: hsl(355 55% 44%); --primary-dim: hsl(355 52% 64%); }
+  [data-theme="light"][data-accent="green"]  { --primary: hsl(92 35% 34%); --primary-dim: hsl(92 28% 65%); }
+  [data-theme="light"][data-accent="purple"] { --primary: hsl(311 28% 40%); --primary-dim: hsl(311 24% 63%); }
+
+  * { border-radius: 0; box-sizing: border-box; }
+  body {
+    background: var(--surface-0);
+    color: var(--fg);
+    font-family: 'Source Code Pro', monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem 1rem 3rem;
+  }
+  a { color: var(--primary-dim); text-underline-offset: 3px; }
+
+  /* header: prompt line, page title, theme and accent controls */
+  header { border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+  .prompt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
+  .prompt .mark { color: var(--primary); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  h1 { font-size: 42px; line-height: 1.1; margin: 0.2rem 0 0.4rem; font-weight: 700; }
+  h1 .cursor { color: var(--primary); }
+  .controls { display: flex; gap: 0.4rem; align-items: center; }
+  .swatch, .icon-btn {
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--fg);
+    font: inherit; font-size: 11px; padding: 0.25rem 0.5rem; cursor: pointer;
+  }
+  .swatch { width: 1.6rem; height: 1.6rem; padding: 0; }
+  .swatch[aria-pressed="true"] { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .icon-btn:hover, .swatch:hover { border-color: var(--border-hover); }
+  .lede { color: var(--fg-muted); max-width: 60ch; margin: 0.4rem 0 0; }
+
+  /* workspace: controls card and canvas card */
+  main { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 1rem; margin-top: 1rem; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  .card { border: 1px solid var(--border); background: var(--surface-1); padding: 1rem; }
+  .card > h2 {
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--fg-muted); margin: 0 0 0.8rem; font-weight: 600;
+  }
+
+  #drop {
+    border: 1px dashed var(--border); padding: 1.2rem 1rem; text-align: center;
+    cursor: pointer; color: var(--fg-muted);
+  }
+  #drop:hover, #drop.hover { border-color: var(--border-hover); color: var(--fg); background: var(--surface-2); }
+  #drop.loaded { border-style: solid; border-color: var(--primary); }
+
+  .field { margin: 0.9rem 0; }
+  .field > span {
+    display: flex; justify-content: space-between; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 0.25rem;
+  }
+  .field > span output { color: var(--fg); text-transform: none; letter-spacing: 0; }
+  input[type="range"] { width: 100%; accent-color: var(--primary); margin: 0; }
+
+  .segment { display: flex; }
+  .segment button {
+    flex: 1; font: inherit; font-size: 13px; padding: 0.35rem 0.5rem; cursor: pointer;
+    background: var(--surface-1); color: var(--fg); border: 1px solid var(--border);
+  }
+  .segment button + button { border-left: none; }
+  .segment button[aria-pressed="true"] {
+    background: var(--primary); color: var(--primary-fg); border-color: var(--primary);
+  }
+
+  #render {
+    width: 100%; margin-top: 1rem; font: inherit; font-weight: 600; font-size: 13px;
+    padding: 0.55rem 1rem; cursor: pointer;
+    background: var(--primary); color: var(--primary-fg); border: 1px solid var(--primary);
+  }
+  #render:hover:not(:disabled) { filter: brightness(1.08); }
+  #render:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* output card: canvas plus a terminal-style status line and stats */
+  .stage { display: flex; flex-direction: column; }
+  canvas { width: 100%; height: auto; background: var(--surface-0); border: 1px solid var(--border); }
+  #status { margin: 0.6rem 0 0; font-size: 11px; color: var(--fg-muted); min-height: 1.2em; }
+  #status::before { content: '> '; color: var(--primary); }
+  #status.error { color: var(--danger); }
+  .stats { display: flex; gap: 1.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+  .stats div { display: none; }
+  .stats.ready div { display: block; }
+  .stats .value { font-size: 26px; font-weight: 700; color: var(--primary); line-height: 1.1; }
+  .stats .label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
+  #download { display: inline-block; margin-top: 0.6rem; font-size: 11px; }
+
+  footer { margin-top: 1.5rem; font-size: 11px; color: var(--fg-muted); }
 </style>
 </head>
 <body>
-<h1>ReString playground</h1>
-<p>Drop a photo, watch the greedy search wind a single thread around the nails. Everything runs locally in your browser: no upload, no server.</p>
 
-<div id="drop">drop a PNG/JPEG photo here, or click to pick one</div>
-<input id="file" type="file" accept="image/png,image/jpeg" hidden>
+<header>
+  <div class="row">
+    <div>
+      <div class="prompt"><span class="mark">❯</span> ~/restring --browser</div>
+      <h1>restring playground<span class="cursor">_</span></h1>
+    </div>
+    <div class="controls">
+      <button class="icon-btn" id="theme" title="switch theme">☾ light</button>
+      <button class="swatch" data-accent="frost"  style="background: hsl(193 44% 67%)" title="frost"  aria-pressed="true"></button>
+      <button class="swatch" data-accent="steel"  style="background: hsl(210 34% 63%)" title="steel"  aria-pressed="false"></button>
+      <button class="swatch" data-accent="red"    style="background: hsl(355 52% 64%)" title="red"    aria-pressed="false"></button>
+      <button class="swatch" data-accent="green"  style="background: hsl(92 28% 65%)"  title="green"  aria-pressed="false"></button>
+      <button class="swatch" data-accent="purple" style="background: hsl(311 24% 63%)" title="purple" aria-pressed="false"></button>
+    </div>
+  </div>
+  <p class="lede">Drop a photo. The greedy search winds one uncut thread around the nails, and the page renders the picture. Everything runs locally in wasm: no upload, no server.</p>
+</header>
 
-<label>Layout
-  <select id="layout">
-    <option value="rect" selected>rectangle border</option>
-    <option value="circle">circle border</option>
-  </select>
-</label>
-<label>Pulls (<span id="pulls-label">600</span>, capped at 1000)
-  <input id="pulls" type="range" min="100" max="1000" step="50" value="600">
-</label>
-<label>Nail step (<span id="step-label">4</span>, smaller = more nails)
-  <input id="step" type="range" min="2" max="8" step="1" value="4">
-</label>
-<label>Thread strength (<span id="strength-label">0.10</span>)
-  <input id="strength" type="range" min="0.05" max="0.2" step="0.01" value="0.10">
-</label>
-<label>Center weight (0 = off)
-  <input id="weight" type="range" min="0" max="3" step="0.5" value="0">
-</label>
+<main>
+  <section class="card">
+    <h2>input</h2>
+    <div id="drop">drop a PNG/JPEG photo here, or click to pick one</div>
+    <input id="file" type="file" accept="image/png,image/jpeg" hidden>
 
-<button id="render" disabled>Render</button>
-<p><a id="download" download="restring.png" hidden>download the PNG</a></p>
-<p id="status">loading the wasm module...</p>
-<canvas id="canvas" width="600" height="600"></canvas>
+    <div class="field"><span>layout</span></div>
+    <div class="segment" id="layout">
+      <button value="rect" aria-pressed="true">rect</button>
+      <button value="circle" aria-pressed="false">circle</button>
+    </div>
+
+    <div class="field"><span>pulls <output id="pulls-label">600</output></span>
+      <input id="pulls" type="range" min="100" max="1000" step="50" value="600">
+    </div>
+    <div class="field"><span>nail step <output id="step-label">4</output></span>
+      <input id="step" type="range" min="2" max="8" step="1" value="4">
+    </div>
+    <div class="field"><span>thread strength <output id="strength-label">0.10</output></span>
+      <input id="strength" type="range" min="0.05" max="0.2" step="0.01" value="0.10">
+    </div>
+    <div class="field"><span>center weight <output id="weight-label">off</output></span>
+      <input id="weight" type="range" min="0" max="3" step="0.5" value="0">
+    </div>
+
+    <button id="render" disabled>wind the thread</button>
+  </section>
+
+  <section class="card stage">
+    <h2>output</h2>
+    <canvas id="canvas" width="600" height="600"></canvas>
+    <p id="status">loading the wasm module...</p>
+    <div class="stats" id="stats">
+      <div><div class="value" id="stat-pulls">–</div><div class="label">pulls</div></div>
+      <div><div class="value" id="stat-nails">–</div><div class="label">nails</div></div>
+      <div><div class="value" id="stat-time">–</div><div class="label">seconds</div></div>
+    </div>
+    <a id="download" download="restring.png" hidden>download the PNG</a>
+  </section>
+</main>
+
+<footer>
+  runs on the same Rust core as the <a href="https://github.com/InzGIBA/ReString">ReString</a> CLI, compiled to wasm. theme: <a href="https://github.com/InzGIBA/smui">smui</a> nord.
+</footer>
 
 <script type="module">
 import init, { load_image, generate, render_png } from './pkg/restring_wasm.js';
@@ -57,11 +210,41 @@ const file = document.getElementById('file');
 const renderBtn = document.getElementById('render');
 const canvas = document.getElementById('canvas');
 const download = document.getElementById('download');
+const stats = document.getElementById('stats');
+const root = document.documentElement;
+
+// theme and accent: persisted, first visit follows the system preference
+const theme = localStorage.getItem('restring-theme')
+  ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+root.dataset.theme = theme;
+const accent = localStorage.getItem('restring-accent') ?? 'frost';
+root.dataset.accent = accent;
+syncControls();
+
+document.getElementById('theme').addEventListener('click', () => {
+  root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('restring-theme', root.dataset.theme);
+  syncControls();
+});
+for (const swatch of document.querySelectorAll('.swatch')) {
+  swatch.addEventListener('click', () => {
+    root.dataset.accent = swatch.dataset.accent;
+    localStorage.setItem('restring-accent', swatch.dataset.accent);
+    syncControls();
+  });
+}
+function syncControls() {
+  const light = root.dataset.theme === 'light';
+  document.getElementById('theme').textContent = light ? '☀ dark' : '☾ light';
+  for (const swatch of document.querySelectorAll('.swatch')) {
+    swatch.setAttribute('aria-pressed', String(swatch.dataset.accent === root.dataset.accent));
+  }
+}
 
 let photo = null; // preprocessed WasmImage
 
 await init();
-status.textContent = 'wasm ready. drop a photo to start.';
+setStatus('wasm ready. drop a photo to start.');
 renderBtn.disabled = false;
 
 function readPhoto(fileOrHandle) {
@@ -69,9 +252,11 @@ function readPhoto(fileOrHandle) {
   reader.onload = () => {
     try {
       photo = load_image(new Uint8Array(reader.result));
-      status.textContent = 'photo loaded. set the sliders and render.';
+      drop.classList.add('loaded');
+      drop.textContent = fileOrHandle.name;
+      setStatus('photo loaded. set the sliders and wind.');
     } catch (e) {
-      status.textContent = 'decode failed: ' + e.message;
+      setStatus('decode failed: ' + e.message, true);
     }
   };
   reader.readAsArrayBuffer(fileOrHandle);
@@ -92,15 +277,35 @@ for (const id of ['pulls', 'step', 'strength']) {
     document.getElementById(id + '-label').textContent = e.target.value;
   });
 }
+document.getElementById('weight').addEventListener('input', e => {
+  document.getElementById('weight-label').textContent =
+    Number(e.target.value) === 0 ? 'off' : e.target.value;
+});
+for (const button of document.querySelectorAll('#layout button')) {
+  button.addEventListener('click', () => {
+    for (const other of document.querySelectorAll('#layout button')) {
+      other.setAttribute('aria-pressed', 'false');
+    }
+    button.setAttribute('aria-pressed', 'true');
+  });
+}
+function currentLayout() {
+  return document.querySelector('#layout button[aria-pressed="true"]').value;
+}
+
+function setStatus(message, error = false) {
+  status.textContent = message;
+  status.classList.toggle('error', error);
+}
 
 renderBtn.addEventListener('click', () => {
-  if (!photo) { status.textContent = 'load a photo first.'; return; }
+  if (!photo) { setStatus('load a photo first.', true); return; }
   const pulls = Number(document.getElementById('pulls').value);
   const step = Number(document.getElementById('step').value);
   const strength = Number(document.getElementById('strength').value);
   const weight = Number(document.getElementById('weight').value);
-  const layout = document.getElementById('layout').value;
-  status.textContent = 'searching...';
+  const layout = currentLayout();
+  setStatus('searching...');
   setTimeout(() => {
     try {
       const t0 = performance.now();
@@ -108,18 +313,20 @@ renderBtn.addEventListener('click', () => {
       const png = render_png(art, 600);
       const blob = new Blob([png], { type: 'image/png' });
       const ctx = canvas.getContext('2d');
-      const bitmap = createImageBitmap(blob);
-      bitmap.then(bm => {
+      createImageBitmap(blob).then(bm => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(bm, 0, 0);
       });
       download.href = URL.createObjectURL(blob);
       download.hidden = false;
       const seconds = ((performance.now() - t0) / 1000).toFixed(1);
-      status.textContent = art.pulls() + ' pulls around ' + art.nails_count() +
-        ' nails, rendered in ' + seconds + ' s.';
+      document.getElementById('stat-pulls').textContent = art.pulls();
+      document.getElementById('stat-nails').textContent = art.nails_count();
+      document.getElementById('stat-time').textContent = seconds;
+      stats.classList.add('ready');
+      setStatus('done. wind it for real with the restring CLI.');
     } catch (e) {
-      status.textContent = 'render failed: ' + e.message;
+      setStatus('render failed: ' + e.message, true);
     }
   }, 10);
 });
