@@ -313,7 +313,7 @@ renderBtn.addEventListener('click', () => {
   setTimeout(() => {
     try {
       const t0 = performance.now();
-      const art = generate(photo, layout, step, pulls, strength > 0 ? strength : null, weight > 0 ? weight : null);
+      const art = generate(photo, layout, step, pulls, strength, weight > 0 ? weight : null);
       const png = render_png(art, 600);
       const blob = new Blob([png], { type: 'image/png' });
       const ctx = canvas.getContext('2d');

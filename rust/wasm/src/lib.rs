@@ -83,10 +83,11 @@ pub fn generate(
         _ => core::circle_nails(GRID, GRID, nail_step, 1.0, 1.0),
     };
     let working_strength = -0.05;
-    let export_strength = match strength {
-        Some(s) if s.abs() > 1e-9 => -s.abs().clamp(0.03, 0.3),
-        // the fitted auto rule, same as the CLI default
-        _ => -(104.0 / pulls.max(1) as f64).clamp(0.03, 0.3),
+    // strength 0 means auto: the fitted 104/L rule, same as the CLI default
+    let export_strength = if strength.abs() > 1e-9 {
+        -strength.abs().clamp(0.03, 0.3)
+    } else {
+        -(104.0 / pulls.max(1) as f64).clamp(0.03, 0.3)
     };
     let weights = weight.map(|peak| core::gaussian_weights(GRID, GRID, GRID as f64 / 3.0, peak, 0.5));
     let (order, _final) = core::create_art(
