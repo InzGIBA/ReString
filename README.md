@@ -8,14 +8,14 @@ Feed in a portrait. The greedy search picks one thread at a time, and each pull 
 
 [Quick start](#quick-start) · [Usage](#usage) · [Tuning](#tuning) · [Development](#development) · [Contributing](#contributing) · [License](#license)
 
-Try it in the browser: the [playground](https://inzgiba.github.io/ReString/) runs the same core as a wasm module. Drop a photo, no install. The page deploys from `web/` (`.github/workflows/pages.yml`).
+Try it in the browser: the [playground](https://inzgiba.github.io/ReString/) runs the same core as a wasm module. Drop a photo, watch the thread wind live, pick a palette, save the project, print the poster, download the GIF, then wind it for real with the step-by-step [winding assistant](https://inzgiba.github.io/ReString/wind.html). No install, no upload. The page deploys from `web/` (`.github/workflows/pages.yml`).
 
 ## Overview
 
 - **For:** makers winding physical boards, machine and plotter owners, and anyone who wants a digital string-art render.
 - **Input:** a PNG or JPEG photo; face-centered portraits work best.
 - **Output:** a PNG render of the thread pattern; the Python API also returns the continuous nail-by-nail pull order.
-- **Scope:** greedy search on a 300 px working grid, five nail-layout families, black-and-white and color palettes, `.restring` project files, printable winding posters, GIF animations and a physical thread model. Building from source requires a Rust toolchain, there is no pure-Python fallback.
+- **Scope:** greedy search on a 300 px working grid, five nail-layout families, black-and-white and color palettes (including palettes suggested from the photo), `.restring` project files with stored palette colors, printable winding posters, GIF animations, machine exports (SVG paths, DXF, CSV/TXT), a physical thread model, and a browser playground with a step-by-step winding assistant. Building from source requires a Rust toolchain, there is no pure-Python fallback.
 
 ![A photo becomes a thread drawing](assets/demo.jpg)
 
@@ -38,10 +38,11 @@ The project started as a 2020 university course assignment by Kaspar Valk, Kert 
   <img alt="Verified output — golden tests pin pixels and pull order" src="assets/feature-03-light.svg" width="32%">
 </picture>
 
-- **One uncut thread**: the pull order is continuous by construction, so you wind a single thread by hand or machine.
-- **Real thread colors**: black-on-white, white-on-black, or a palette. The built-ins are RGB, CMY and CMYK, or load a JSON list of the floss colors you own. CMYK measures 42 to 45 percent better than RGB at an equal budget.
+- **One uncut thread**: the pull order is continuous by construction, so you wind a single thread by hand or machine. Stopped early? `--extra-pulls` continues the stored winding from each thread's last nail.
+- **Real thread colors**: black-on-white, white-on-black, or a palette. The built-ins are RGB, CMY and CMYK, `auto:K` suggests K colors from the photo (optionally snapped to the bundled DMC floss chart), or load a JSON list of the floss colors you own. CMYK measures 42 to 45 percent better than RGB at an equal budget.
 - **Custom boards**: polygon, star, multi-ring and SVG-outline layouts via `--layout star:5:0.55`, plus non-square aspect crops ([layouts guide](docs/layouts.md)).
-- **From photo to board**: save a `.restring` project, re-render in milliseconds, print a numbered-nail poster with the thread length in meters, watch the winding as a GIF.
+- **From photo to board**: save a `.restring` project (palette colors included), re-render in milliseconds, print a numbered-nail poster with the thread length in meters, watch the winding as a GIF, or feed a plotter with SVG/DXF exports.
+- **Photo control**: crop, contrast, gamma, invert and per-pixel weight maps steer the search before it starts.
 - **Measured, not guessed**: every flag has a degradation curve behind it in the [tuning guide](docs/tuning.md).
 
 ## Quick start
@@ -101,12 +102,23 @@ restring -i portrait.png -o out.png --rect -n 2 -l 3000
 | `-r2 <float>` | horizontal nail ellipse multiplier | 1 |
 | `--rect` | nails on the rectangle border instead of the circle. Better for square portraits, about 2x lower error | circle |
 | `--rgb` | colored output with three interleaved pure RGB threads | black and white |
-| `--palette <name|file>` | thread palette: `rgb`, `cmy`, `cmyk`, or a JSON file of `{"name", "rgb": [r, g, b]}` colors (cap 8 threads). CMYK measures 42 to 45 percent better color MSE than RGB at an equal budget | off |
+| `--palette <name|file>` | thread palette: `rgb`, `cmy`, `cmyk`, `auto:K[:chart]` (K colors suggested from the photo; chart is `dmc` for the bundled DMC starter or a palette JSON path), or a JSON file of `{"name", "rgb": [r, g, b]}` colors. CMYK measures 42 to 45 percent better color MSE than RGB at an equal budget | off |
+| `--max-threads <int>` | palette thread cap | 8 |
 | `--wb` | white thread on a black canvas | black on white |
 | `--weight <float>` | importance weighting. A Gaussian weight map steers threads toward the image center, where the viewer looks. Suggested range 1.5 to 5.0. Portrait subjects only, about 25 percent more scan time | off |
+| `--weight-map <file>` | grayscale PNG of per-pixel search weights, overrides `--weight` (B/W runs) | off |
+| `--crop <x0,y0,x1,y1>` | source crop as four fractions in 0..1, applied before the square/aspect crop | center crop |
+| `--contrast <float>` | contrast around mid-gray, above 1 hardens | 1 |
+| `--gamma <float>` | gamma power on the 0..1 values, below 1 brightens | 1 |
+| `--invert` | work from the negative of the photo | off |
 | `--min-chord <px>` | candidate filter: chords shorter than the distance in working-grid pixels are banned. Portrait measurement: the greedy never picks short chords, the filter only degrades MSE past 250 px. Intended for sparse custom layouts | off |
-| `--project-out <path>` | save the nail layout and pull order as a `.restring` project alongside the PNG | off |
-| `--project <path>` | re-render from a `.restring` project instead of an image: skips the search, applies the current `-s` and `-d` | off |
+| `--seed <int>` | seed for the `-r` candidate subset, for reproducible runs | 42 |
+| `--preset <name|file>` | `fast`, `balanced` or `max` (the presets above), or a JSON file with `nail_step` and `pulls`. Explicit `-n` / `-l` win | off |
+| `--batch <dir>` | process every PNG/JPEG in the directory; `-o` becomes the output directory, `--project-out` / `--poster` / `--metrics` become directories for per-image files | off |
+| `--project-out <path>` | save the nail layout and pull order as a `.restring` project alongside the PNG; palette colors are stored too (format v2) | off |
+| `--project <path>` | re-render from a `.restring` project instead of an image: skips the search, applies the current `-s` and `-d`. With `-i` and `--extra-pulls` it continues the winding instead | off |
+| `--extra-pulls <int>` | with `--project` and `-i`: append this many new pulls per thread, continuing from each thread's last nail on the same uncut thread | off |
+| `--export <path>` | machine export, format by extension: `.svg` (vector thread paths at board scale), `.dxf` (one LINE per pull), `.csv` / `.txt` (the winding order) | off |
 | `--anim <path>` | with `--project`: animated GIF of the winding sequence. `--anim-frames` sets the frame count, 180 is about 6 s at 30 fps. A 2000-pull project at the default 600 px export lands near 45 MB; `-d 450` brings it to about 28 MB, `-d 380` under 25 MB | off |
 | `--realistic` | physical thread model: threads of `--thread-width` mm (default 0.2) on a `--canvas-size` mm board (default 400). At exports well above 300 px the 0.3 mm width beats the hairline by 35 percent MSE. The search never changes | hairline |
 | `--rollback` | truncate a stagnating run to its best-error prefix. Measured no-op: the search never applies non-improving pulls, so nothing rolls back ([measurement](docs/research/rollback-experiment.md)) | off |
@@ -118,7 +130,7 @@ Nails sit evenly on the perimeter. The circle starts at 9 o'clock and runs clock
 
 ### Save and re-render
 
-The project file keeps the nail layout and the pull order in plain JSON, so a result re-renders in milliseconds without a search and any tool can read the winding sequence:
+The project file keeps the nail layout, the pull order and the palette colors in plain JSON, so a result re-renders in milliseconds without a search and any tool can read the winding sequence:
 
 ```bash
 restring -i portrait.png -o out.png --rect -l 2000 --project-out result.restring
@@ -126,6 +138,15 @@ restring --project result.restring -o out2.png   # byte-identical re-render
 ```
 
 The current `-s` and `-d` apply at re-render time. Schema and compatibility promise: [docs/project-format.md](docs/project-format.md).
+
+Stopped at a low budget? Continue the same winding later, no restart:
+
+```bash
+restring --project result.restring -i portrait.png --extra-pulls 1000 \
+    -o out3.png --project-out bigger.restring
+```
+
+Every thread resumes from its last nail, so the result stays one uncut thread per color.
 
 ### Wind it for real
 
@@ -148,7 +169,7 @@ result.image.save_png("out.png")
 print(result.stats.pulls_per_thread)
 ```
 
-The full options table, the Result fields and the deprecated 1.x names: [docs/api.md](docs/api.md). Images travel as `_core.Image` objects; the pixel data stays in Rust memory, so calls pass references instead of copying arrays.
+The full options table, the Result fields, `continue_project` and the deprecated 1.x names: [docs/api.md](docs/api.md). Images travel as `_core.Image` objects; the pixel data stays in Rust memory, so calls pass references instead of copying arrays.
 
 ## Tuning
 

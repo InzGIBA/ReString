@@ -38,8 +38,13 @@ def animate_project(project, out_path, *, export_strength=None, size=600, frames
             if magnitude is None:
                 magnitude = resolve_export_strength(len(order) - 1)
             strengths.append(magnitude if wb else -magnitude)
-        images = _core.animate_rgb(project.pull_orders, project.nails, strengths,
-                                   gh, gw, size, size, white, frames)
+        if project.mode == "palette":
+            images = _core.animate_palette(project.pull_orders, project.nails,
+                                           [t.rgb for t in project.palette], strengths,
+                                           gh, gw, size, size, white, frames)
+        else:
+            images = _core.animate_rgb(project.pull_orders, project.nails, strengths,
+                                       gh, gw, size, size, white, frames)
 
     _core.save_gif(str(out_path), images, FPS)
     file_bytes = Path(out_path).stat().st_size

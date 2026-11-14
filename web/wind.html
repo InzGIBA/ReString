@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>restring winding assistant</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* smui nord, shared with the playground */
+  :root, [data-theme="light"] {
+    color-scheme: light;
+    --surface-0: hsl(218 27% 94%); --surface-1: hsl(218 27% 89%);
+    --surface-2: hsl(219 28% 84%); --fg: hsl(220 16% 22%);
+    --fg-muted: hsl(220 17% 28%); --border: hsl(219 18% 72%);
+    --border-hover: hsl(220 17% 50%); --primary-fg: hsl(0 0% 100%);
+    --danger: hsl(355 60% 45%);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: hsl(213 16% 12%); --surface-1: hsl(217 16% 15.5%);
+    --surface-2: hsl(216 15% 19%); --fg: hsl(213 27% 88%);
+    --fg-muted: hsl(213 14% 65%); --border: hsl(217 17% 28%);
+    --border-hover: hsl(216 12% 37%); --primary-fg: hsl(213 16% 12%);
+    --danger: hsl(355 52% 65%);
+  }
+  [data-accent="frost"]  { --primary: hsl(193 44% 67%); --primary-dim: hsl(193 40% 38%); }
+  [data-accent="steel"]  { --primary: hsl(210 34% 63%); --primary-dim: hsl(210 34% 40%); }
+  [data-accent="red"]    { --primary: hsl(355 52% 64%); --primary-dim: hsl(355 55% 44%); }
+  [data-accent="green"]  { --primary: hsl(92 28% 65%);  --primary-dim: hsl(92 35% 34%); }
+  [data-accent="purple"] { --primary: hsl(311 24% 63%); --primary-dim: hsl(311 28% 40%); }
+  [data-theme="light"][data-accent="frost"]  { --primary: hsl(193 40% 38%); --primary-dim: hsl(193 44% 67%); }
+  [data-theme="light"][data-accent="steel"]  { --primary: hsl(210 34% 40%); --primary-dim: hsl(210 34% 63%); }
+  [data-theme="light"][data-accent="red"]    { --primary: hsl(355 55% 44%); --primary-dim: hsl(355 52% 64%); }
+  [data-theme="light"][data-accent="green"]  { --primary: hsl(92 35% 34%); --primary-dim: hsl(92 28% 65%); }
+  [data-theme="light"][data-accent="purple"] { --primary: hsl(311 28% 40%); --primary-dim: hsl(311 24% 63%); }
+
+  * { border-radius: 0; box-sizing: border-box; }
+  body {
+    background: var(--surface-0); color: var(--fg);
+    font-family: 'Source Code Pro', monospace; font-size: 13px; line-height: 1.55;
+    max-width: 960px; margin: 0 auto; padding: 2rem 1rem 3rem;
+  }
+  a { color: var(--primary-dim); text-underline-offset: 3px; }
+  header { border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+  .prompt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
+  .prompt .mark { color: var(--primary); }
+  h1 { font-size: 32px; line-height: 1.1; margin: 0.2rem 0 0.4rem; font-weight: 700; }
+  h1 .cursor { color: var(--primary); }
+  .lede { color: var(--fg-muted); max-width: 64ch; margin: 0.4rem 0 0; }
+  main { display: grid; grid-template-columns: 1fr minmax(240px, 300px); gap: 1rem; margin-top: 1rem; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  .card { border: 1px solid var(--border); background: var(--surface-1); padding: 1rem; }
+  .card > h2 { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); margin: 0 0 0.8rem; font-weight: 600; }
+  canvas { width: 100%; height: auto; background: var(--surface-0); border: 1px solid var(--border); display: block; }
+  #drop { border: 1px dashed var(--border); padding: 1.2rem 1rem; text-align: center; cursor: pointer; color: var(--fg-muted); }
+  #drop:hover { border-color: var(--border-hover); color: var(--fg); background: var(--surface-2); }
+  .step-display { text-align: center; margin: 0.8rem 0; }
+  .step-display .chord { font-size: 30px; font-weight: 700; color: var(--primary); line-height: 1.2; }
+  .step-display .counter { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
+  .nav { display: flex; gap: 0.4rem; }
+  .nav button {
+    flex: 1; font: inherit; font-weight: 600; padding: 0.55rem 0.5rem; cursor: pointer;
+    background: var(--primary); color: var(--primary-fg); border: 1px solid var(--primary);
+  }
+  .nav button.secondary { background: var(--surface-2); color: var(--fg); border-color: var(--border); }
+  .nav button:hover:not(:disabled) { filter: brightness(1.08); }
+  .nav button:disabled { opacity: 0.45; cursor: not-allowed; }
+  input[type="range"] { width: 100%; accent-color: var(--primary); margin: 0.6rem 0 0; }
+  .threads { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
+  .threads button {
+    font: inherit; font-size: 12px; padding: 0.3rem 0.6rem; cursor: pointer;
+    background: var(--surface-1); color: var(--fg); border: 1px solid var(--border);
+  }
+  .threads button[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+  .meta { font-size: 11px; color: var(--fg-muted); margin-top: 0.8rem; }
+  #status { margin: 0.6rem 0 0; font-size: 11px; color: var(--fg-muted); min-height: 1.2em; }
+  #status::before { content: '> '; color: var(--primary); }
+  #status.error { color: var(--danger); }
+  footer { margin-top: 1.5rem; font-size: 11px; color: var(--fg-muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="prompt"><span class="mark">❯</span> ~/restring --wind</div>
+  <h1>winding assistant<span class="cursor">_</span></h1>
+  <p class="lede">Load a .restring project and wind it nail by nail. The board highlights the current chord, the counter tracks your progress, and the session survives a closed tab. Arrow keys step too.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>board</h2>
+    <canvas id="board" width="700" height="700"></canvas>
+    <p id="status">load a project to start.</p>
+  </section>
+
+  <section class="card">
+    <h2>step</h2>
+    <div id="drop">drop a .restring file here, or click to pick one</div>
+    <input id="file" type="file" accept=".restring,application/json" hidden>
+
+    <div id="controls" hidden>
+      <div class="threads" id="threads"></div>
+      <div class="step-display">
+        <div class="chord" id="chord">–</div>
+        <div class="counter" id="counter">pull 0 / 0</div>
+      </div>
+      <div class="nav">
+        <button id="prev" class="secondary">← prev</button>
+        <button id="next">next →</button>
+      </div>
+      <input type="range" id="scrub" min="0" max="0" value="0">
+      <div class="meta" id="meta"></div>
+      <div class="nav" style="margin-top: 0.8rem;">
+        <button id="reset" class="secondary">reset session</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  part of the <a href="index.html">restring playground</a>. print the numbered poster from the playground, hammer the nails, then wind along here.
+</footer>
+
+<script type="module">
+import { threadLengthsMm } from './poster.js';
+
+const board = document.getElementById('board');
+const ctx = board.getContext('2d');
+const status = document.getElementById('status');
+const root = document.documentElement;
+
+root.dataset.theme = localStorage.getItem('restring-theme')
+  ?? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+root.dataset.accent = localStorage.getItem('restring-accent') ?? 'frost';
+
+let project = null;
+let sessionKey = null;
+let thread = 0;
+let done = [];          // completed pulls per thread
+
+const css = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+
+function setStatus(message, error = false) {
+  status.textContent = message;
+  status.classList.toggle('error', error);
+}
+
+function hash(text) {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+function threadColor(k) {
+  if (project.mode === 'bw') return css('--fg');
+  if (project.mode === 'rgb') return ['#c22222', '#22a04a', '#2244cc'][k];
+  const rgb = project.palette[k].rgb;
+  if (Math.min(...rgb) > 0.85) return css('--fg-muted');
+  return '#' + rgb.map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+}
+
+function threadName(k) {
+  if (project.mode === 'bw') return project.config.wb ? 'white' : 'black';
+  if (project.mode === 'rgb') return ['red', 'green', 'blue'][k];
+  return project.palette[k].name;
+}
+
+function saveSession() {
+  if (sessionKey) localStorage.setItem(sessionKey, JSON.stringify({ thread, done }));
+}
+
+function loadSession() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(sessionKey));
+    if (saved && Array.isArray(saved.done) && saved.done.length === project.pull_orders.length) {
+      thread = Math.min(saved.thread || 0, project.pull_orders.length - 1);
+      done = saved.done.map((v, k) => Math.max(0, Math.min(v, project.pull_orders[k].length - 1)));
+      return;
+    }
+  } catch { /* fresh session */ }
+  thread = 0;
+  done = project.pull_orders.map(() => 0);
+}
+
+function gridSides() {
+  const grid = (project.config && project.config.grid) || 300;
+  return Array.isArray(grid) ? [grid[0], grid[1]] : [grid, grid];
+}
+
+function nailXY(nail) {
+  const [gh, gw] = gridSides();
+  const pad = 46;
+  const side = board.width - 2 * pad;
+  return [pad + (nail[1] / gw) * side, pad + (nail[0] / gh) * side];
+}
+
+function draw() {
+  const fg = css('--fg');
+  const muted = css('--fg-muted');
+  const primary = css('--primary');
+  ctx.clearRect(0, 0, board.width, board.height);
+
+  // finished threads stay on the board in their own color, faint
+  project.pull_orders.forEach((order, k) => {
+    if (k === thread) return;
+    const upTo = done[k];
+    if (upTo <= 0) return;
+    ctx.strokeStyle = threadColor(k);
+    ctx.globalAlpha = 0.22;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < upTo; i++) {
+      const [x1, y1] = nailXY(project.nails[order[i]]);
+      const [x2, y2] = nailXY(project.nails[order[i + 1]]);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  // wound part of the current thread
+  const order = project.pull_orders[thread];
+  const upTo = done[thread];
+  ctx.strokeStyle = threadColor(thread);
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < upTo; i++) {
+    const [x1, y1] = nailXY(project.nails[order[i]]);
+    const [x2, y2] = nailXY(project.nails[order[i + 1]]);
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // nails and numbers
+  const [gh, gw] = gridSides();
+  project.nails.forEach((nail, i) => {
+    const [x, y] = nailXY(nail);
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+    if (i % 10 === 0) {
+      const dx = nail[1] - gw / 2;
+      const dy = nail[0] - gh / 2;
+      const norm = Math.hypot(dx, dy) || 1;
+      ctx.fillStyle = muted;
+      ctx.font = '10px "Source Code Pro", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(i), x + (dx / norm) * 16, y + (dy / norm) * 16 + 3);
+    }
+  });
+
+  // the current chord, loud
+  if (upTo < order.length - 1) {
+    const a = order[upTo];
+    const b = order[upTo + 1];
+    const [x1, y1] = nailXY(project.nails[a]);
+    const [x2, y2] = nailXY(project.nails[b]);
+    ctx.strokeStyle = primary;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    for (const [x, y, nail] of [[x1, y1, a], [x2, y2, b]]) {
+      ctx.fillStyle = primary;
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = 'bold 14px "Source Code Pro", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(nail), x, y - 12);
+    }
+  }
+}
+
+function syncUi() {
+  const order = project.pull_orders[thread];
+  const total = order.length - 1;
+  const upTo = done[thread];
+  document.getElementById('chord').textContent =
+    upTo < total ? `${order[upTo]} → ${order[upTo + 1]}` : 'thread done';
+  document.getElementById('counter').textContent = `pull ${upTo} / ${total}`;
+  const scrub = document.getElementById('scrub');
+  scrub.max = String(total);
+  scrub.value = String(upTo);
+  document.getElementById('prev').disabled = upTo <= 0;
+  document.getElementById('next').disabled = upTo >= total;
+  const lengths = threadLengthsMm(project, 400);
+  document.getElementById('meta').textContent =
+    `thread ${thread + 1}/${project.pull_orders.length} (${threadName(thread)}), ` +
+    `${(lengths[thread] / 1000).toFixed(0)} m at 400 mm board, ${project.nails.length} nails`;
+  for (const button of document.querySelectorAll('#threads button')) {
+    button.setAttribute('aria-pressed', String(Number(button.dataset.thread) === thread));
+    const k = Number(button.dataset.thread);
+    button.textContent = `${threadName(k)} ${done[k]}/${project.pull_orders[k].length - 1}`;
+  }
+  draw();
+  saveSession();
+}
+
+function step(delta) {
+  const total = project.pull_orders[thread].length - 1;
+  done[thread] = Math.max(0, Math.min(total, done[thread] + delta));
+  syncUi();
+}
+
+function loadProject(data, source) {
+  if (!data || data.format !== 'restring-project' || !Array.isArray(data.pull_orders)) {
+    throw new Error('not a restring project');
+  }
+  project = data;
+  localStorage.setItem('restring-wind-project', JSON.stringify(data));
+  sessionKey = 'restring-wind-' + hash(JSON.stringify(data.pull_orders) + data.nails.length);
+  loadSession();
+  document.getElementById('drop').hidden = true;
+  document.getElementById('controls').hidden = false;
+  const threads = document.getElementById('threads');
+  threads.innerHTML = '';
+  project.pull_orders.forEach((_, k) => {
+    const button = document.createElement('button');
+    button.dataset.thread = String(k);
+    button.addEventListener('click', () => { thread = k; syncUi(); });
+    threads.appendChild(button);
+  });
+  syncUi();
+  setStatus(`${source}: winding ${project.pull_orders.length} thread(s). next → or the right arrow key.`);
+}
+
+document.getElementById('next').addEventListener('click', () => step(1));
+document.getElementById('prev').addEventListener('click', () => step(-1));
+document.getElementById('scrub').addEventListener('input', (e) => {
+  done[thread] = Number(e.target.value);
+  syncUi();
+});
+document.getElementById('reset').addEventListener('click', () => {
+  done = project.pull_orders.map(() => 0);
+  thread = 0;
+  syncUi();
+  setStatus('session reset. back to nail 0.');
+});
+document.addEventListener('keydown', (e) => {
+  if (!project) return;
+  if (e.key === 'ArrowRight') { step(1); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { step(-1); e.preventDefault(); }
+});
+
+const drop = document.getElementById('drop');
+const file = document.getElementById('file');
+drop.addEventListener('click', () => file.click());
+file.addEventListener('change', async () => {
+  try {
+    loadProject(JSON.parse(await file.files[0].text()), file.files[0].name);
+  } catch (e) {
+    setStatus('load failed: ' + e.message, true);
+  }
+});
+drop.addEventListener('dragover', (e) => e.preventDefault());
+drop.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  if (!e.dataTransfer.files.length) return;
+  try {
+    loadProject(JSON.parse(await e.dataTransfer.files[0].text()), e.dataTransfer.files[0].name);
+  } catch (err) {
+    setStatus('load failed: ' + err.message, true);
+  }
+});
+
+// the playground hands the finished project over through localStorage;
+// otherwise reopen the last project so the session survives a reload
+const handoff = localStorage.getItem('restring-handoff');
+if (handoff) {
+  localStorage.removeItem('restring-handoff');
+  try {
+    loadProject(JSON.parse(handoff), 'from the playground');
+  } catch (e) {
+    setStatus('handoff failed: ' + e.message, true);
+  }
+} else {
+  const saved = localStorage.getItem('restring-wind-project');
+  if (saved) {
+    try {
+      loadProject(JSON.parse(saved), 'last session');
+    } catch { /* start empty */ }
+  }
+}
+</script>
+</body>
+</html>

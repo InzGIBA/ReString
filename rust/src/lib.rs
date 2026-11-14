@@ -73,6 +73,18 @@ impl Image {
         Image { inner: self.inner.largest_square() }
     }
 
+    /// Rectangular crop in pixel bounds (x0, y0, x1, y1), half-open.
+    fn crop(&self, x0: usize, y0: usize, x1: usize, y1: usize) -> PyResult<Self> {
+        self.inner.crop(x0, y0, x1, y1)
+            .map(|img| Image { inner: img })
+            .map_err(PyValueError::new_err)
+    }
+
+    /// Contrast around mid-gray, gamma power, inversion, in that order.
+    fn adjust(&self, contrast: f64, gamma: f64, invert: bool) -> Self {
+        Image { inner: self.inner.adjust(contrast, gamma, invert) }
+    }
+
     /// Anti-aliased box/bilinear resample (port of image_transformations.resize).
     fn resize(&self, out_w: usize, out_h: usize) -> Self {
         Image { inner: self.inner.resize(out_w, out_h) }
@@ -164,6 +176,41 @@ fn create_art(
     Ok((order, Image { inner: final_img }))
 }
 
+#[pyfunction(signature = (nails, orig, prev_order, strength, i_limit=None, random_nails=None, white=true, weights=None, min_chord=None, rollback=false, seed=None))]
+fn continue_art(
+    py: Python<'_>,
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    prev_order: Vec<u64>,
+    strength: f64,
+    i_limit: Option<u64>,
+    random_nails: Option<u64>,
+    white: bool,
+    weights: Option<&Image>,
+    min_chord: Option<f64>,
+    rollback: bool,
+    seed: Option<u64>,
+) -> PyResult<(Vec<u64>, Image)> {
+    let mut messages = Vec::new();
+    let (order, final_img) = core::continue_art(
+        nails,
+        &orig.inner,
+        prev_order,
+        strength,
+        i_limit,
+        random_nails,
+        white,
+        weights.map(|w| &w.inner),
+        min_chord,
+        rollback,
+        seed,
+        Some(&mut messages),
+    )
+    .map_err(PyValueError::new_err)?;
+    emit_messages(py, &messages);
+    Ok((order, Image { inner: final_img }))
+}
+
 /// Gaussian center-focus weight map for importance-weighted search.
 #[pyfunction]
 fn gaussian_weights(w: usize, h: usize, sigma: f64, peak: f64, bg: f64) -> Image {
@@ -232,6 +279,25 @@ fn animate_rgb(
     frames: usize,
 ) -> PyResult<Vec<Image>> {
     core::animate_rgb(orders, nails, strengths, in_w, in_h, out_w, out_h, white, frames)
+        .map(|frames| frames.into_iter().map(|img| Image { inner: img }).collect())
+        .map_err(PyValueError::new_err)
+}
+
+#[pyfunction(signature = (orders, nails, colors, strengths, in_w, in_h, out_w, out_h, white, frames))]
+fn animate_palette(
+    orders: Vec<Vec<u64>>,
+    nails: Vec<(i64, i64)>,
+    colors: Vec<(f64, f64, f64)>,
+    strengths: Vec<f64>,
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+    frames: usize,
+) -> PyResult<Vec<Image>> {
+    let colors: Vec<[f64; 3]> = colors.into_iter().map(|(r, g, b)| [r, g, b]).collect();
+    core::animate_palette(orders, nails, colors, strengths, in_w, in_h, out_w, out_h, white, frames)
         .map(|frames| frames.into_iter().map(|img| Image { inner: img }).collect())
         .map_err(PyValueError::new_err)
 }
@@ -415,6 +481,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(circle_nails, m)?)?;
     m.add_function(wrap_pyfunction!(rect_nails, m)?)?;
     m.add_function(wrap_pyfunction!(create_art, m)?)?;
+    m.add_function(wrap_pyfunction!(continue_art, m)?)?;
     m.add_function(wrap_pyfunction!(gaussian_weights, m)?)?;
     m.add_function(wrap_pyfunction!(beam_search, m)?)?;
     m.add_function(wrap_pyfunction!(horizon_search, m)?)?;
@@ -427,6 +494,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render_palette, m)?)?;
     m.add_function(wrap_pyfunction!(animate_bw, m)?)?;
     m.add_function(wrap_pyfunction!(animate_rgb, m)?)?;
+    m.add_function(wrap_pyfunction!(animate_palette, m)?)?;
     m.add_function(wrap_pyfunction!(save_gif, m)?)?;
     m.add_function(wrap_pyfunction!(thick_line, m)?)?;
     m.add_function(wrap_pyfunction!(gradient_magnitude, m)?)?;

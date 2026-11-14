@@ -4,6 +4,7 @@
 //! (rust/wasm/) wrap this crate.
 
 use std::collections::HashSet;
+use std::rc::Rc;
 
 // ---------------------------------------------------------------------------
 // Image container
@@ -185,6 +186,42 @@ impl Image {
             data.extend_from_slice(&self.data[start..start + w * self.ch]);
         }
         Image { data, w, h, ch: self.ch }
+    }
+
+    /// Rectangular crop in pixel bounds, x0..x1 columns and y0..y1 rows,
+    /// half-open. Bounds must sit inside the image and be non-empty.
+    pub fn crop(&self, x0: usize, y0: usize, x1: usize, y1: usize) -> Result<Image, String> {
+        if x1 <= x0 || y1 <= y0 || x1 > self.w || y1 > self.h {
+            return Err(format!("crop bounds ({x0}, {y0}, {x1}, {y1}) outside the {}x{} image", self.w, self.h));
+        }
+        let w = x1 - x0;
+        let h = y1 - y0;
+        let mut data = Vec::with_capacity(w * h * self.ch);
+        for r in y0..y1 {
+            let start = (r * self.w + x0) * self.ch;
+            data.extend_from_slice(&self.data[start..start + w * self.ch]);
+        }
+        Ok(Image { data, w, h, ch: self.ch })
+    }
+
+    /// Point adjustments on the 0..1 values: contrast around mid-gray,
+    /// gamma power, then inversion. The identity (1.0, 1.0, false) copies.
+    pub fn adjust(&self, contrast: f64, gamma: f64, invert: bool) -> Image {
+        let data = self
+            .data
+            .iter()
+            .map(|&v| {
+                let mut v = ((v - 0.5) * contrast + 0.5).clamp(0.0, 1.0);
+                if gamma != 1.0 {
+                    v = v.powf(gamma);
+                }
+                if invert {
+                    v = 1.0 - v;
+                }
+                v
+            })
+            .collect();
+        Image { data, w: self.w, h: self.h, ch: self.ch }
     }
 
     /// Anti-aliased box/bilinear resample (port of image_transformations.resize).
@@ -610,92 +647,413 @@ pub fn create_art(
     min_chord: Option<f64>,
     rollback: bool,
     seed: Option<u64>,
-    mut messages: Option<&mut Vec<(String, String)>>,
+    messages: Option<&mut Vec<(String, String)>>,
 ) -> Result<(Vec<u64>, Image), String> {
-    if orig.ch != 1 {
-        return Err("create_art needs a grayscale target".to_string());
-    }
-    let weight_map: Vec<f64> = match weights {
-        None => Vec::new(),
-        Some(w) => {
-            if w.ch != 1 || w.w != orig.w || w.h != orig.h {
-                return Err("weights must be grayscale with the same shape as orig".to_string());
-            }
-            w.data.clone()
-        }
-    };
+    let (weight_map, order, sources, masks) =
+        greedy_setup(&nails, orig, random_nails, weights, min_chord, seed)?;
     let (w, h) = (orig.w, orig.h);
-    let n = nails.len();
 
-    let order: Vec<usize> = match random_nails {
-        None => (0..n).collect(),
-        Some(k) => seeded_subset(n, k as usize, seed.unwrap_or(42)),
-    };
-
-    // parallel rasterization across sources
-    let sources = build_line_cache(&nails, w, n);
-
-    // per-source candidate masks: allowed[seg] keeps chords at or above the
-    // minimum distance. Distance in pixels, not nail indices, so the filter
-    // behaves the same on circle, rectangle and custom layouts.
-    let min_chord_sq = min_chord.map(|d| d * d);
-    let masks: Vec<Vec<bool>> = match min_chord_sq {
-        None => Vec::new(),
-        Some(mc2) => sources
-            .iter()
-            .enumerate()
-            .map(|(i, sl)| {
-                sl.targets
-                    .iter()
-                    .map(|&t| {
-                        let (dr, dc) = (
-                            (nails[t as usize].0 - nails[i].0) as f64,
-                            (nails[t as usize].1 - nails[i].1) as f64,
-                        );
-                        dr * dr + dc * dc >= mc2
-                    })
-                    .collect()
-            })
-            .collect(),
-    };
-
-    let mut pic = vec![if white { 1.0 } else { 0.0 }; w * h];
-    let mut pull_order: Vec<u64> = vec![0];
-    let mut current = 0usize;
-    let mut i = 0u64;
-    let mut fails = 0u32;
-    let mut recovery_logged = false;
-
-    // best-prefix tracking: the blank canvas error minus the improvements of
-    // every applied pull telescopes into the true canvas error, so the
-    // minimum marks the best prefix exactly
     let initial_fill = if white { 1.0 } else { 0.0 };
-    let mut running_error: f64 = orig
+    let running_error: f64 = orig
         .data
         .iter()
         .map(|o| (initial_fill - o) * (initial_fill - o))
         .sum();
-    let mut best_error = running_error;
-    let mut best_len = 0usize;
+    let state = GreedyState {
+        pic: vec![initial_fill; w * h],
+        pull_order: vec![0],
+        current: 0,
+        running_error,
+        best_error: running_error,
+        best_len: 0,
+        fails: 0,
+        recovery_logged: false,
+    };
+    let (state, _stalled) = greedy_loop(&sources, &masks, &order, nails.len(), &orig.data,
+                                        &weight_map, strength, i_limit, false, rollback, state,
+                                        messages);
+    Ok((state.pull_order, Image { data: state.pic, w, h, ch: 1 }))
+}
+
+/// Continue a finished pull order with more pulls on the same thread: the
+/// previous order is replayed onto a fresh working canvas, the search resumes
+/// from its last nail and appends. `i_limit` counts the new pulls only. The
+/// returned order is the previous order plus the new tail, one uncut thread.
+pub fn continue_art(
+    nails: Vec<(i64, i64)>,
+    orig: &Image,
+    prev_order: Vec<u64>,
+    strength: f64,
+    i_limit: Option<u64>,
+    random_nails: Option<u64>,
+    white: bool,
+    weights: Option<&Image>,
+    min_chord: Option<f64>,
+    rollback: bool,
+    seed: Option<u64>,
+    messages: Option<&mut Vec<(String, String)>>,
+) -> Result<(Vec<u64>, Image), String> {
+    if prev_order.is_empty() {
+        return Err("continue_art needs a non-empty previous pull order".to_string());
+    }
+    let n = nails.len();
+    if prev_order.iter().any(|&i| i as usize >= n) {
+        return Err("continue_art: previous order references a nail outside the layout".to_string());
+    }
+    let (weight_map, order, sources, masks) =
+        greedy_setup(&nails, orig, random_nails, weights, min_chord, seed)?;
+    let (w, h) = (orig.w, orig.h);
+
+    // replay the previous order exactly as the search applied it: same
+    // strength, same clamp, padding steps (a == b) draw nothing
+    let initial_fill = if white { 1.0 } else { 0.0 };
+    let pic = replay_canvas(&sources, &prev_order, strength, initial_fill, w, h);
+    let running_error: f64 = pic
+        .iter()
+        .zip(orig.data.iter())
+        .map(|(p, o)| (p - o) * (p - o))
+        .sum();
+    let state = GreedyState {
+        pic,
+        current: *prev_order.last().unwrap() as usize,
+        best_len: prev_order.len() - 1,
+        pull_order: prev_order,
+        running_error,
+        best_error: running_error,
+        fails: 0,
+        recovery_logged: false,
+    };
+    let (state, _stalled) = greedy_loop(&sources, &masks, &order, n, &orig.data, &weight_map,
+                                        strength, i_limit, false, rollback, state, messages);
+    Ok((state.pull_order, Image { data: state.pic, w, h, ch: 1 }))
+}
+
+/// Replay a pull order onto a fresh canvas exactly as the search applied it:
+/// same strength, same clamp. Padding steps (a == b) draw nothing.
+fn replay_canvas(
+    sources: &[SourceLines],
+    prev_order: &[u64],
+    strength: f64,
+    initial_fill: f64,
+    w: usize,
+    h: usize,
+) -> Vec<f64> {
+    let mut pic = vec![initial_fill; w * h];
+    for pair in prev_order.windows(2) {
+        let (a, b) = (pair[0] as usize, pair[1] as usize);
+        if a == b {
+            continue;
+        }
+        let sl = &sources[a];
+        if let Ok(seg) = sl.targets.binary_search(&(b as u32)) {
+            let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
+            for k in s0..s1 {
+                let px = sl.flat_idx[k] as usize;
+                pic[px] = (pic[px] + strength * sl.val[k]).clamp(0.0, 1.0);
+            }
+        }
+    }
+    pic
+}
+
+/// Persistent greedy search for chunked runs (the browser playground):
+/// build once, step many times, render previews in between. The line cache
+/// lives across steps, so a chunked run costs the same as a single run.
+pub struct Search {
+    setup: SearchSetup,
+    orig: Vec<f64>,
+    weight_map: Vec<f64>,
+    strength: f64,
+    w: usize,
+    h: usize,
+    state: GreedyState,
+    budget: Option<u64>,
+    appended: u64,
+    stalled: bool,
+}
+
+impl Search {
+    /// A fresh search from a blank canvas. `budget` caps the total pulls;
+    /// None runs until stagnation.
+    pub fn new(
+        nails: Vec<(i64, i64)>,
+        orig: &Image,
+        strength: f64,
+        budget: Option<u64>,
+        random_nails: Option<u64>,
+        white: bool,
+        weights: Option<&Image>,
+        min_chord: Option<f64>,
+        seed: Option<u64>,
+    ) -> Result<Search, String> {
+        let setup = SearchSetup::build(&nails, orig.w, random_nails, min_chord, seed);
+        Search::from_setup(&setup, orig, strength, budget, white, weights, None)
+    }
+
+    /// A search resumed from a stored pull order: the order is replayed and
+    /// the new pulls append to it, one uncut thread. `budget` caps the new
+    /// pulls only.
+    pub fn from_prev(
+        nails: Vec<(i64, i64)>,
+        orig: &Image,
+        prev_order: Vec<u64>,
+        strength: f64,
+        budget: Option<u64>,
+        random_nails: Option<u64>,
+        white: bool,
+        weights: Option<&Image>,
+        min_chord: Option<f64>,
+        seed: Option<u64>,
+    ) -> Result<Search, String> {
+        let setup = SearchSetup::build(&nails, orig.w, random_nails, min_chord, seed);
+        Search::from_setup(&setup, orig, strength, budget, white, weights, Some(prev_order))
+    }
+
+    /// Build a search on shared caches: multi-thread runs build the setup
+    /// once and start one Search per thread color.
+    pub fn from_setup(
+        setup: &SearchSetup,
+        orig: &Image,
+        strength: f64,
+        budget: Option<u64>,
+        white: bool,
+        weights: Option<&Image>,
+        prev_order: Option<Vec<u64>>,
+    ) -> Result<Search, String> {
+        if orig.ch != 1 {
+            return Err("Search needs a grayscale target".to_string());
+        }
+        let weight_map = validate_weights(orig, weights)?;
+        let (w, h) = (orig.w, orig.h);
+        let initial_fill = if white { 1.0 } else { 0.0 };
+        let (pic, current, best_len, pull_order) = match prev_order {
+            None => (vec![initial_fill; w * h], 0usize, 0usize, vec![0u64]),
+            Some(prev) => {
+                if prev.is_empty() {
+                    return Err("Search::from_prev needs a non-empty previous pull order".to_string());
+                }
+                if prev.iter().any(|&i| i as usize >= setup.n) {
+                    return Err("Search::from_prev: previous order references a nail outside the layout".to_string());
+                }
+                let pic = replay_canvas(&setup.sources, &prev, strength, initial_fill, w, h);
+                let current = *prev.last().unwrap() as usize;
+                (pic, current, prev.len() - 1, prev)
+            }
+        };
+        let running_error: f64 = pic
+            .iter()
+            .zip(orig.data.iter())
+            .map(|(p, o)| (p - o) * (p - o))
+            .sum();
+        let state = GreedyState {
+            pic,
+            pull_order,
+            current,
+            running_error,
+            best_error: running_error,
+            best_len,
+            fails: 0,
+            recovery_logged: false,
+        };
+        Ok(Search {
+            setup: SearchSetup {
+                sources: Rc::clone(&setup.sources),
+                masks: Rc::clone(&setup.masks),
+                candidates: Rc::clone(&setup.candidates),
+                n: setup.n,
+            },
+            orig: orig.data.clone(),
+            weight_map, strength, w, h, state, budget, appended: 0, stalled: false,
+        })
+    }
+
+    /// Advance by up to `pulls` new pulls. Stops early on stagnation (three
+    /// non-improving pulls) or when the total budget is reached. Returns the
+    /// number of pulls this call appended.
+    pub fn step(&mut self, pulls: u64) -> u64 {
+        if self.stalled {
+            return 0;
+        }
+        let mut k = pulls;
+        if let Some(budget) = self.budget {
+            k = k.min(budget.saturating_sub(self.appended));
+        }
+        if k == 0 {
+            return 0;
+        }
+        let before = self.state.pull_order.len() as u64;
+        let state = std::mem::replace(&mut self.state, GreedyState {
+            pic: Vec::new(), pull_order: Vec::new(), current: 0,
+            running_error: 0.0, best_error: 0.0, best_len: 0, fails: 0,
+            recovery_logged: false,
+        });
+        let (state, stalled) = greedy_loop(
+            &self.setup.sources, &self.setup.masks, &self.setup.candidates, self.setup.n,
+            &self.orig, &self.weight_map, self.strength, Some(k), true, false, state,
+            None,
+        );
+        let added = state.pull_order.len() as u64 - before;
+        self.appended += added;
+        self.stalled = stalled;
+        self.state = state;
+        added
+    }
+
+    /// True when the budget is spent or the search stagnated.
+    pub fn finished(&self) -> bool {
+        self.stalled || self.budget.map(|b| self.appended >= b).unwrap_or(false)
+    }
+
+    pub fn order(&self) -> &[u64] {
+        &self.state.pull_order
+    }
+
+    pub fn pulls(&self) -> u64 {
+        self.state.pull_order.len() as u64 - 1
+    }
+
+    /// The working canvas as it stands (clamped snapshot).
+    pub fn canvas(&self) -> Image {
+        snapshot(&self.state.pic, self.w, self.h, 1)
+    }
+
+    /// The grayscale target the search works against.
+    pub fn target(&self) -> Image {
+        Image { data: self.orig.clone(), w: self.w, h: self.h, ch: 1 }
+    }
+}
+
+/// Shared search caches: the line cache, candidate masks and the candidate
+/// subset depend only on the layout, so multi-thread runs build them once
+/// and share them across threads (Rc, single-threaded wasm included).
+pub struct SearchSetup {
+    sources: Rc<Vec<SourceLines>>,
+    masks: Rc<Vec<Vec<bool>>>,
+    candidates: Rc<Vec<usize>>,
+    n: usize,
+}
+
+impl SearchSetup {
+    pub fn build(
+        nails: &[(i64, i64)],
+        w: usize,
+        random_nails: Option<u64>,
+        min_chord: Option<f64>,
+        seed: Option<u64>,
+    ) -> SearchSetup {
+        let n = nails.len();
+        let candidates: Vec<usize> = match random_nails {
+            None => (0..n).collect(),
+            Some(k) => seeded_subset(n, k as usize, seed.unwrap_or(42)),
+        };
+        let sources = build_line_cache(nails, w, n);
+        let min_chord_sq = min_chord.map(|d| d * d);
+        let masks: Vec<Vec<bool>> = match min_chord_sq {
+            None => Vec::new(),
+            Some(mc2) => sources
+                .iter()
+                .enumerate()
+                .map(|(i, sl)| {
+                    sl.targets
+                        .iter()
+                        .map(|&t| {
+                            let (dr, dc) = (
+                                (nails[t as usize].0 - nails[i].0) as f64,
+                                (nails[t as usize].1 - nails[i].1) as f64,
+                            );
+                            dr * dr + dc * dc >= mc2
+                        })
+                        .collect()
+                })
+                .collect(),
+        };
+        SearchSetup {
+            sources: Rc::new(sources),
+            masks: Rc::new(masks),
+            candidates: Rc::new(candidates),
+            n,
+        }
+    }
+}
+
+/// Shared validation and caches for create_art and continue_art.
+fn greedy_setup(
+    nails: &[(i64, i64)],
+    orig: &Image,
+    random_nails: Option<u64>,
+    weights: Option<&Image>,
+    min_chord: Option<f64>,
+    seed: Option<u64>,
+) -> Result<(Vec<f64>, Rc<Vec<usize>>, Rc<Vec<SourceLines>>, Rc<Vec<Vec<bool>>>), String> {
+    if orig.ch != 1 {
+        return Err("create_art needs a grayscale target".to_string());
+    }
+    let weight_map = validate_weights(orig, weights)?;
+    let setup = SearchSetup::build(nails, orig.w, random_nails, min_chord, seed);
+    Ok((weight_map, setup.candidates, setup.sources, setup.masks))
+}
+
+fn validate_weights(orig: &Image, weights: Option<&Image>) -> Result<Vec<f64>, String> {
+    match weights {
+        None => Ok(Vec::new()),
+        Some(w) => {
+            if w.ch != 1 || w.w != orig.w || w.h != orig.h {
+                return Err("weights must be grayscale with the same shape as orig".to_string());
+            }
+            Ok(w.data.clone())
+        }
+    }
+}
+
+/// Mutable state of one greedy run: the working canvas, the order built so
+/// far and the best-prefix tracking for rollback.
+struct GreedyState {
+    pic: Vec<f64>,
+    pull_order: Vec<u64>,
+    current: usize,
+    running_error: f64,
+    best_error: f64,
+    best_len: usize,
+    fails: u32,
+    recovery_logged: bool,
+}
+
+/// The greedy loop shared by create_art, continue_art and Search. `i_limit`
+/// counts the pulls appended by this call. With no limit (or `stagnation`)
+/// the run stops after 3 non-improving iterations; `stalled` reports that
+/// stop so chunked callers can finish early.
+fn greedy_loop(
+    sources: &[SourceLines],
+    masks: &[Vec<bool>],
+    order: &[usize],
+    n: usize,
+    orig: &[f64],
+    weight_map: &[f64],
+    strength: f64,
+    i_limit: Option<u64>,
+    stagnation: bool,
+    rollback: bool,
+    mut state: GreedyState,
+    mut messages: Option<&mut Vec<(String, String)>>,
+) -> (GreedyState, bool) {
+    let mut i = 0u64;
+    let mut stalled = false;
 
     loop {
         i += 1;
 
-        match i_limit {
-            None => {
-                if fails >= 3 {
-                    break;
-                }
-            }
-            Some(limit) => {
-                if i > limit {
-                    break;
-                }
+        if let Some(limit) = i_limit {
+            if i > limit {
+                break;
             }
         }
+        if (i_limit.is_none() || stagnation) && state.fails >= 3 {
+            stalled = true;
+            break;
+        }
 
-        let sl = &sources[current];
-        let allowed: &[bool] = if masks.is_empty() { &[] } else { &masks[current] };
+        let sl = &sources[state.current];
+        let allowed: &[bool] = if masks.is_empty() { &[] } else { &masks[state.current] };
         let mut best_target: u64 = 0;
         let mut best_improvement = f64::NEG_INFINITY;
         let mut best_range = (0usize, 0usize);
@@ -704,8 +1062,8 @@ pub fn create_art(
         let mut fb_range = (0usize, 0usize);
         let mut allowed_seen = false;
 
-        for &cand in &order {
-            if cand == current || cand >= n {
+        for &cand in order {
+            if cand == state.current || cand >= n {
                 continue;
             }
             let seg = match sl.targets.binary_search(&(cand as u32)) {
@@ -713,7 +1071,7 @@ pub fn create_art(
                 Err(_) => continue,
             };
             let (s0, s1) = (sl.bounds[seg], sl.bounds[seg + 1]);
-            let improvement = seg_improvement(sl, &pic, &orig.data, &weight_map, s0, s1, strength);
+            let improvement = seg_improvement(sl, &state.pic, orig, weight_map, s0, s1, strength);
             if !allowed.is_empty() && !allowed[seg] {
                 // masked out: rank it anyway, recovery may need it
                 if improvement > fb_improvement {
@@ -733,13 +1091,13 @@ pub fn create_art(
 
         if best_improvement <= 0.0 {
             if allowed_seen || fb_improvement <= 0.0 {
-                fails += 1;
+                state.fails += 1;
                 continue;
             }
             // dead-end recovery: every chord from this nail sits under the
             // threshold, take the best masked-out pull once instead of stalling
-            if !recovery_logged {
-                recovery_logged = true;
+            if !state.recovery_logged {
+                state.recovery_logged = true;
                 if let Some(sink) = messages.as_deref_mut() {
                     sink.push(("debug".to_string(), "min-chord dead end: no candidate clears the threshold, taking the best masked-out pull".to_string()));
                 }
@@ -749,27 +1107,27 @@ pub fn create_art(
             best_improvement = fb_improvement;
         }
 
-        pull_order.push(best_target);
-        running_error -= best_improvement;
+        state.pull_order.push(best_target);
+        state.running_error -= best_improvement;
         for k in best_range.0..best_range.1 {
             let px = sl.flat_idx[k] as usize;
-            pic[px] = (pic[px] + strength * sl.val[k]).clamp(0.0, 1.0);
+            state.pic[px] = (state.pic[px] + strength * sl.val[k]).clamp(0.0, 1.0);
         }
-        current = best_target as usize;
-        if running_error < best_error {
-            best_error = running_error;
-            best_len = pull_order.len() - 1;
+        state.current = best_target as usize;
+        if state.running_error < state.best_error {
+            state.best_error = state.running_error;
+            state.best_len = state.pull_order.len() - 1;
         }
     }
 
-    if rollback && pull_order.len() - 1 > best_len {
+    if rollback && state.pull_order.len() - 1 > state.best_len {
         if let Some(sink) = messages.as_deref_mut() {
-            sink.push(("info".to_string(), format!("Rolled back {} of {} pulls", pull_order.len() - 1 - best_len, pull_order.len() - 1)));
+            sink.push(("info".to_string(), format!("Rolled back {} of {} pulls", state.pull_order.len() - 1 - state.best_len, state.pull_order.len() - 1)));
         }
-        pull_order.truncate(best_len + 1);
+        state.pull_order.truncate(state.best_len + 1);
     }
 
-    Ok((pull_order, Image { data: pic, w, h, ch: 1 }))
+    (state, stalled)
 }
 
 // ---------------------------------------------------------------------------
@@ -1146,11 +1504,32 @@ pub fn animate_rgb(
     white: bool,
     frames: usize,
 ) -> Result<Vec<Image>, String> {
+    let colors = vec![[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    animate_palette(orders, nails, colors, strengths, in_w, in_h, out_w, out_h, white, frames)
+}
+
+/// Snapshot an animation of interleaved pull orders for an arbitrary thread
+/// palette: one color per order, the render_palette contract. Frames follow
+/// the same raw/downsampled split as animate_bw.
+pub fn animate_palette(
+    orders: Vec<Vec<u64>>,
+    nails: Vec<(i64, i64)>,
+    colors: Vec<[f64; 3]>,
+    strengths: Vec<f64>,
+    in_w: usize,
+    in_h: usize,
+    out_w: usize,
+    out_h: usize,
+    white: bool,
+    frames: usize,
+) -> Result<Vec<Image>, String> {
     if strengths.len() != orders.len() {
-        return Err("animate_rgb needs one strength per channel order".to_string());
+        return Err("animate_palette needs one strength per channel order".to_string());
+    }
+    if colors.len() != orders.len() {
+        return Err("animate_palette needs one color per channel order".to_string());
     }
     let nails = scaled_nails(&nails, out_w as f64 / in_w as f64, out_h as f64 / in_h as f64);
-    let colors: [[f64; 3]; 3] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     let mut canvas = vec![if white { 1.0 } else { 0.0 }; out_w * out_h * 3];
     let total = orders.first().map(|o| o.len().saturating_sub(1)).unwrap_or(0);
     let mut out: Vec<Image> = Vec::new();
@@ -1225,10 +1604,19 @@ pub fn draw_bw_step(
 /// full-canvas frames so disposal semantics do not matter). Returns the
 /// number of frames written.
 pub fn save_gif(path: &str, images: &[Image], fps: u16) -> Result<usize, String> {
+    let bytes = encode_gif(images, fps)?;
+    std::fs::write(path, bytes).map_err(|e| format!("cannot create {path}: {e}"))?;
+    Ok(images.len())
+}
+
+/// Encode frames as an animated GIF in memory (infinite loop, full-canvas
+/// frames so disposal semantics do not matter). The browser binding has no
+/// filesystem, so it ships these bytes straight to a download.
+pub fn encode_gif(images: &[Image], fps: u16) -> Result<Vec<u8>, String> {
     use image::codecs::gif::{GifEncoder, Repeat};
 
-    let file = std::fs::File::create(path).map_err(|e| format!("cannot create {path}: {e}"))?;
-    let mut encoder = GifEncoder::new(file);
+    let mut out = std::io::Cursor::new(Vec::new());
+    let mut encoder = GifEncoder::new(&mut out);
     encoder
         .set_repeat(Repeat::Infinite)
         .map_err(|e| format!("gif encoder setup failed: {e}"))?;
@@ -1252,7 +1640,7 @@ pub fn save_gif(path: &str, images: &[Image], fps: u16) -> Result<usize, String>
                 }
             }
             _ => {
-                return Err("save_gif supports 1-channel and 3-channel images".to_string());
+                return Err("encode_gif supports 1-channel and 3-channel images".to_string());
             }
         }
         let buffer = image::RgbaImage::from_raw(img.w as u32, img.h as u32, rgba)
@@ -1261,7 +1649,8 @@ pub fn save_gif(path: &str, images: &[Image], fps: u16) -> Result<usize, String>
             .encode_frame(image::Frame::from_parts(buffer, 0, 0, delay))
             .map_err(|e| format!("gif encode failed: {e}"))?;
     }
-    Ok(images.len())
+    drop(encoder);
+    Ok(out.into_inner())
 }
 
 /// Sobel gradient magnitude (grayscale; color images collapse through the

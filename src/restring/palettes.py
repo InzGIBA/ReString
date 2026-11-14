@@ -71,9 +71,10 @@ def _parse_thread(entry, source):
     return ThreadColor(str(name), tuple(float(v) for v in rgb))
 
 
-def load_palette(path):
+def load_palette(path, max_threads=MAX_THREADS):
     """Load a palette JSON file: a list of {"name", "rgb": [r, g, b]} entries.
-    Entries with a "comment" instead of "rgb" are skipped (file headers)."""
+    Entries with a "comment" instead of "rgb" are skipped (file headers).
+    `max_threads=None` lifts the cap (floss charts are longer than runs)."""
     data = json.loads(Path(path).read_text())
     if not isinstance(data, list):
         raise PaletteError(f"palette file must be a JSON list, got {type(data).__name__}")
@@ -84,16 +85,16 @@ def load_palette(path):
             threads.append(thread)
     if not threads:
         raise PaletteError(f"{path}: palette file carries no thread colors")
-    if len(threads) > MAX_THREADS:
-        raise PaletteError(f"{path}: {len(threads)} threads exceeds the cap of {MAX_THREADS}")
+    if max_threads is not None and len(threads) > max_threads:
+        raise PaletteError(f"{path}: {len(threads)} threads exceeds the cap of {max_threads}")
     return threads
 
 
-def resolve_palette(spec):
+def resolve_palette(spec, max_threads=MAX_THREADS):
     """A palette spec is a built-in name or a path to a JSON palette file."""
     if spec in _builtin_threads():
         return builtin_palette(spec)
     if not Path(spec).is_file():
         raise PaletteError(
             f"unknown palette {spec!r}: not a built-in name and no file at that path")
-    return load_palette(spec)
+    return load_palette(spec, max_threads=max_threads)

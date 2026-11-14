@@ -7,6 +7,7 @@ here.
 """
 
 import math
+from xml.sax.saxutils import escape
 
 import restring
 
@@ -20,6 +21,24 @@ FOOTER_MM = 16.0
 CHANNEL_COLORS = ["#c22222", "#22a04a", "#2244cc"]
 NAIL_COLOR = "#222222"
 START_COLOR = "#c22222"
+
+
+def _hex(rgb):
+    return "#" + "".join(f"{round(v * 255):02x}" for v in rgb)
+
+
+def thread_colors(project):
+    """Preview stroke color per pull order: the legacy R/G/B scheme for rgb
+    projects, the stored thread colors for palette projects. Near-white
+    threads fall back to the nail color so they stay visible on paper."""
+    if project.mode == "bw":
+        return [NAIL_COLOR]
+    if project.mode == "rgb":
+        return list(CHANNEL_COLORS)
+    colors = []
+    for thread in project.palette:
+        colors.append(NAIL_COLOR if min(thread.rgb) > 0.85 else _hex(thread.rgb))
+    return colors
 
 
 def _grid_sides(project):
@@ -82,7 +101,7 @@ def poster_svg(project, *, canvas_size_mm=260.0, number_every=10, show_preview=F
            f'height="{canvas_size_mm:g}" fill="none" stroke="{NAIL_COLOR}" stroke-width="0.3"/>']
 
     if show_preview:
-        colors = CHANNEL_COLORS if project.mode == "rgb" else [NAIL_COLOR]
+        colors = thread_colors(project)
         for order, color in zip(project.pull_orders, colors):
             segments = " ".join(
                 f'<line x1="{xy(project.nails[a])[0]:.2f}" y1="{xy(project.nails[a])[1]:.2f}" '
@@ -120,11 +139,15 @@ def poster_svg(project, *, canvas_size_mm=260.0, number_every=10, show_preview=F
     pulls = [len(order) - 1 for order in project.pull_orders]
     lengths_mm = thread_lengths_mm(project, canvas_size_mm)
     lengths_m = [length / 1000 for length in lengths_mm]
-    if project.mode == "rgb":
+    if project.mode == "bw":
+        thread_info = f"Threads: 1, thread length: {lengths_m[0]:.0f} m"
+    elif project.mode == "rgb":
         thread_info = (f"Threads: 3 (R/G/B), thread lengths: "
                        f"{'/'.join(f'{value:.0f}' for value in lengths_m)} m")
     else:
-        thread_info = f"Threads: 1, thread length: {lengths_m[0]:.0f} m"
+        names = "/".join(escape(t.name) for t in project.palette)
+        thread_info = (f"Threads: {len(project.palette)} ({names}), thread lengths: "
+                       f"{'/'.join(f'{value:.0f}' for value in lengths_m)} m")
     date = project.created or "-"
     out.append(
         f'<text x="{MARGIN_MM}" y="{ph - FOOTER_MM + 4}" font-size="3.4" '

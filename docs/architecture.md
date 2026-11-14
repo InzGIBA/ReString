@@ -26,17 +26,20 @@ The `Image` class holds pixels in a `Vec<f64>` with width, height and channel co
 | Responsibility | Where | Notes |
 |---|---|---|
 | PNG/JPEG codecs | `Image.load`, `Image.save_png` | `image` crate, RGB float 0..1, GIF behind the `gif` feature |
-| Crops and resample | `Image.largest_square`, `Image.resize` | box filter when downscaling, bilinear when upscaling |
+| Crops and resample | `Image.largest_square`, `Image.crop`, `Image.resize` | box filter when downscaling, bilinear when upscaling; `crop` takes pixel bounds |
+| Point adjustments | `Image.adjust` | contrast around mid-gray, gamma, inversion, in that order |
 | Grayscale, channels | `Image.gray`, `Image.channel` | standard luminance weights |
 | Nail layouts | `circle_nails`, `rect_nails` | midpoint ellipse rasterization; polygon, star, rings and SVG sampling are pure Python (`layouts.py`) |
 | Line rasterizer | `line_aa`, `thick_line` | Zingl algorithm, pixel-identical to the original skimage port; the thick variant covers width in pixels |
 | Greedy search | `create_art` | line cache, working canvas and the scan loop all in Rust; optional importance weights, chord filter, best-prefix rollback |
+| Continuation | `continue_art` | replays a stored order and appends new pulls from its last nail, one uncut thread |
+| Chunked search | `Search`, `SearchSetup` | persistent greedy state for the browser worker: step, preview, resume; multi-thread runs share one line cache via `Rc` |
 | Renders | `render_bw`, `render_rgb`, `render_palette` | nail scaling included, each with a thick variant |
-| Animation | `animate_bw`, `animate_rgb`, `save_gif` | per-pull snapshots, GIF via the `image` crate |
+| Animation | `animate_bw`, `animate_rgb`, `animate_palette`, `save_gif`, `encode_gif` | per-pull snapshots, GIF via the `image` crate; `encode_gif` returns bytes for the filesystem-less wasm target |
 | Metrics | `ssim`, `mse`, `corr`, `ssim_blur` | integral-image SSIM, box-blurred variant for thread renders, no dependencies |
 | Analysis | `Image.gradient_magnitude` | Sobel magnitude, shipped with the adaptive-placement research |
 
-The Python modules are thin wrappers. `api.py` is the 2.0 facade (`generate(source, options) -> Result`). `generator.py` orchestrates the search; `canvas.py`, `nails.py`, `layouts.py`, `palettes.py`, `image_transformations.py` and `metrics.py` delegate to the core or build data for it. `project.py`, `poster.py` and `animation.py` turn a finished pull order into a project file, an SVG poster and a GIF. `cli.py` wires the flow end to end without numpy or pillow.
+The Python modules are thin wrappers. `api.py` is the 2.0 facade (`generate(source, options) -> Result`, `continue_project(source, project, extra_pulls) -> Result`). `generator.py` orchestrates the search; `canvas.py`, `nails.py`, `layouts.py`, `palettes.py`, `auto_palette.py`, `image_transformations.py` and `metrics.py` delegate to the core or build data for it. `project.py`, `poster.py`, `animation.py` and `exports.py` turn a finished pull order into a project file, an SVG poster, a GIF and machine exports (SVG paths, DXF, CSV/TXT). `cli.py` wires the flow end to end without numpy or pillow.
 
 ## Greedy search
 
@@ -45,6 +48,8 @@ The Python modules are thin wrappers. `api.py` is the 2.0 facade (`generate(sour
 The line cache is rasterized across cores with `std::thread::scope`. Chunks reassemble in source order, so output stays bit-identical regardless of thread count.
 
 Iteration stops after a fixed budget or after 3 pulls with no improvement, whichever comes first. The `-r` flag restricts the scan to a fixed subset drawn once by a seeded splitmix64 sampler with Floyd's algorithm, seed 42. Optional search-time parameters, all defaulting off and all measured first: a per-pixel importance weight map (`--weight`, `scan_candidates_weighted`), a minimum chord distance (`--min-chord`, a precomputed mask over the line cache), and best-prefix truncation (`--rollback`).
+
+`continue_art` and `Search` reuse the same scan loop. `continue_art` replays a stored order onto a fresh working canvas (same strength, same clamp) and resumes from its last nail, so a continued winding stays one uncut thread and matches a fresh run at the combined budget while the search keeps improving. `Search` keeps the greedy state and the line cache alive between `step()` calls: the browser worker advances in chunks, renders previews in between and cancels cleanly, without rebuilding the cache per chunk. `SearchSetup` holds the caches behind `Rc` so a color run's threads share one copy.
 
 ## Correctness model
 

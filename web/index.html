@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>restring playground</title>
+<link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600;700&display=swap" rel="stylesheet">
@@ -102,27 +103,40 @@
   .field > span output { color: var(--fg); text-transform: none; letter-spacing: 0; }
   input[type="range"] { width: 100%; accent-color: var(--primary); margin: 0; }
 
-  .segment { display: flex; }
+  .segment { display: flex; flex-wrap: wrap; }
   .segment button {
-    flex: 1; font: inherit; font-size: 13px; padding: 0.35rem 0.5rem; cursor: pointer;
+    flex: 1; font: inherit; font-size: 12px; padding: 0.35rem 0.4rem; cursor: pointer;
     background: var(--surface-1); color: var(--fg); border: 1px solid var(--border);
   }
   .segment button + button { border-left: none; }
   .segment button[aria-pressed="true"] {
     background: var(--primary); color: var(--primary-fg); border-color: var(--primary);
   }
+  #palette-json {
+    width: 100%; margin-top: 0.4rem; font: inherit; font-size: 11px;
+    background: var(--surface-0); color: var(--fg); border: 1px solid var(--border);
+    padding: 0.4rem; resize: vertical; min-height: 4.5rem;
+  }
 
-  #render {
+  #render, #cancel {
     width: 100%; margin-top: 1rem; font: inherit; font-weight: 600; font-size: 13px;
     padding: 0.55rem 1rem; cursor: pointer;
     background: var(--primary); color: var(--primary-fg); border: 1px solid var(--primary);
   }
-  #render:hover:not(:disabled) { filter: brightness(1.08); }
+  #cancel { background: var(--surface-2); color: var(--fg); border-color: var(--border); margin-top: 0.4rem; }
+  #render:hover:not(:disabled), #cancel:hover { filter: brightness(1.08); }
   #render:disabled { opacity: 0.45; cursor: not-allowed; }
+  .load-project { margin-top: 0.8rem; font-size: 11px; color: var(--fg-muted); }
+  .load-project a { cursor: pointer; }
 
   /* output card: canvas plus a terminal-style status line and stats */
   .stage { display: flex; flex-direction: column; }
-  canvas { width: 100%; height: auto; background: var(--surface-0); border: 1px solid var(--border); }
+  .compare { position: relative; }
+  canvas { width: 100%; height: auto; background: var(--surface-0); border: 1px solid var(--border); display: block; }
+  #original { position: absolute; inset: 0; clip-path: inset(0 100% 0 0); pointer-events: none; }
+  .compare-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; font-size: 11px; color: var(--fg-muted); }
+  .compare-row input[type="range"] { flex: 1; }
+  #progress { width: 100%; margin-top: 0.6rem; accent-color: var(--primary); height: 0.5rem; }
   #status { margin: 0.6rem 0 0; font-size: 11px; color: var(--fg-muted); min-height: 1.2em; }
   #status::before { content: '> '; color: var(--primary); }
   #status.error { color: var(--danger); }
@@ -131,7 +145,12 @@
   .stats.ready div { display: block; }
   .stats .value { font-size: 26px; font-weight: 700; color: var(--primary); line-height: 1.1; }
   .stats .label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-muted); }
-  #download { display: inline-block; margin-top: 0.6rem; font-size: 11px; }
+  .downloads { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.6rem; font-size: 11px; }
+  .downloads a, .downloads button {
+    font: inherit; font-size: 11px; background: none; border: none; padding: 0;
+    color: var(--primary-dim); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+  }
+  .downloads [hidden] { display: none; }
 
   footer { margin-top: 1.5rem; font-size: 11px; color: var(--fg-muted); }
 </style>
@@ -153,7 +172,7 @@
       <button class="swatch" data-accent="purple" style="background: hsl(311 24% 63%)" title="purple" aria-pressed="false"></button>
     </div>
   </div>
-  <p class="lede">Drop a photo. The greedy search winds one uncut thread around the nails, and the page renders the picture. Everything runs locally in wasm: no upload, no server.</p>
+  <p class="lede">Drop a photo. The greedy search winds one uncut thread around the nails, live in a worker while you watch. Everything runs locally in wasm: no upload, no server.</p>
 </header>
 
 <main>
@@ -167,6 +186,17 @@
       <button value="rect" aria-pressed="true">rect</button>
       <button value="circle" aria-pressed="false">circle</button>
     </div>
+
+    <div class="field"><span>palette</span></div>
+    <div class="segment" id="palette">
+      <button value="bw" aria-pressed="true">b/w</button>
+      <button value="wb" aria-pressed="false">w/b</button>
+      <button value="rgb" aria-pressed="false">rgb</button>
+      <button value="cmy" aria-pressed="false">cmy</button>
+      <button value="cmyk" aria-pressed="false">cmyk</button>
+      <button value="custom" aria-pressed="false">json</button>
+    </div>
+    <textarea id="palette-json" hidden spellcheck="false" placeholder='[{"name": "DMC 310", "rgb": [0.05, 0.05, 0.06]}]'></textarea>
 
     <div class="field"><span>pulls <output id="pulls-label">3000</output></span>
       <input id="pulls" type="range" min="100" max="10000" step="100" value="3000">
@@ -182,34 +212,60 @@
     </div>
 
     <button id="render" disabled>wind the thread</button>
+    <button id="cancel" hidden>cancel</button>
+    <div class="load-project">or <a id="load-project">load a .restring project</a> to re-render and export it</div>
+    <input id="project-file" type="file" accept=".restring,application/json" hidden>
   </section>
 
   <section class="card stage">
     <h2>output</h2>
-    <canvas id="canvas" width="600" height="600"></canvas>
+    <div class="compare">
+      <canvas id="canvas" width="600" height="600"></canvas>
+      <canvas id="original" width="600" height="600"></canvas>
+    </div>
+    <div class="compare-row" id="compare-row" hidden>
+      <label><input type="checkbox" id="compare-toggle"> compare</label>
+      <input type="range" id="compare" min="0" max="100" value="50" disabled>
+      <span>before / after</span>
+    </div>
+    <progress id="progress" max="1" value="0" hidden></progress>
     <p id="status">loading the wasm module...</p>
     <div class="stats" id="stats">
       <div><div class="value" id="stat-pulls">–</div><div class="label">pulls</div></div>
       <div><div class="value" id="stat-nails">–</div><div class="label">nails</div></div>
       <div><div class="value" id="stat-time">–</div><div class="label">seconds</div></div>
+      <div><div class="value" id="stat-mse">–</div><div class="label">mse</div></div>
+      <div><div class="value" id="stat-ssim">–</div><div class="label">ssim</div></div>
     </div>
-    <a id="download" download="restring.png" hidden>download the PNG</a>
+    <div class="downloads">
+      <a id="download" download="restring.png" hidden>download the PNG</a>
+      <a id="download-project" download="result.restring" hidden>save the .restring project</a>
+      <a id="download-csv" download="winding.csv" hidden>winding CSV</a>
+      <a id="download-txt" download="winding.txt" hidden>winding TXT</a>
+      <a id="download-poster" download="poster.svg" hidden>poster SVG</a>
+      <button id="gif" hidden>make the winding GIF</button>
+      <a id="download-gif" download="winding.gif" hidden>download the GIF</a>
+      <a id="wind-it" href="wind.html" hidden>wind it step by step →</a>
+    </div>
   </section>
 </main>
 
 <footer>
-  runs on the same Rust core as the <a href="https://github.com/InzGIBA/ReString">ReString</a> CLI, compiled to wasm. theme: <a href="https://github.com/InzGIBA/smui">smui</a> nord.
+  runs on the same Rust core as the <a href="https://github.com/InzGIBA/ReString">ReString</a> CLI, compiled to wasm. theme: <a href="https://github.com/InzGIBA/smui">smui</a> nord. <a href="wind.html">winding assistant</a>.
 </footer>
 
 <script type="module">
-import init, { load_image, generate, render_png } from './pkg/restring_wasm.js';
+import init, { load_image, render_project } from './pkg/restring_wasm.js';
+import { posterSvg, windingCsv, windingTxt } from './poster.js';
 
 const status = document.getElementById('status');
 const drop = document.getElementById('drop');
 const file = document.getElementById('file');
 const renderBtn = document.getElementById('render');
+const cancelBtn = document.getElementById('cancel');
 const canvas = document.getElementById('canvas');
-const download = document.getElementById('download');
+const original = document.getElementById('original');
+const progress = document.getElementById('progress');
 const stats = document.getElementById('stats');
 const root = document.documentElement;
 
@@ -229,7 +285,7 @@ document.getElementById('theme').addEventListener('click', () => {
 for (const swatch of document.querySelectorAll('.swatch')) {
   swatch.addEventListener('click', () => {
     root.dataset.accent = swatch.dataset.accent;
-    localStorage.setItem('restring-accent', swatch.dataset.accent);
+    localStorage.setItem('restring-accent', root.dataset.accent);
     syncControls();
   });
 }
@@ -241,21 +297,84 @@ function syncControls() {
   }
 }
 
-let photo = null; // preprocessed WasmImage
+let photoBytes = null;
+let currentProject = null;
+let lastOptions = null;
+
+const worker = new Worker('./worker.js', { type: 'module' });
+worker.onmessage = (event) => {
+  const msg = event.data;
+  if (msg.type === 'ready') {
+    setStatus('wasm ready. drop a photo to start.');
+    renderBtn.disabled = false;
+  } else if (msg.type === 'progress') {
+    progress.value = msg.pulls / msg.budget;
+    setStatus(`winding... ${msg.pulls} / ${msg.budget} pulls`);
+    drawPng(msg.png, canvas);
+    showQuality(msg.quality);
+  } else if (msg.type === 'done' || msg.type === 'cancelled') {
+    finishRun(msg);
+  } else if (msg.type === 'gif') {
+    const blob = new Blob([msg.gif], { type: 'image/gif' });
+    const link = document.getElementById('download-gif');
+    link.href = URL.createObjectURL(blob);
+    link.hidden = false;
+    document.getElementById('gif').disabled = false;
+    setStatus(`GIF ready (${(blob.size / 1024 / 1024).toFixed(1)} MB).`);
+  } else if (msg.type === 'error') {
+    setStatus('failed: ' + msg.message, true);
+    setRunning(false);
+  }
+};
 
 await init();
-setStatus('wasm ready. drop a photo to start.');
-renderBtn.disabled = false;
+
+function setStatus(message, error = false) {
+  status.textContent = message;
+  status.classList.toggle('error', error);
+}
+
+function setRunning(running) {
+  renderBtn.disabled = running || !photoBytes;
+  cancelBtn.hidden = !running;
+  progress.hidden = !running;
+}
+
+function drawPng(buffer, target) {
+  const blob = new Blob([buffer], { type: 'image/png' });
+  createImageBitmap(blob).then((bm) => {
+    const ctx = target.getContext('2d');
+    ctx.clearRect(0, 0, target.width, target.height);
+    ctx.drawImage(bm, 0, 0, target.width, target.height);
+  });
+}
+
+function showQuality(quality) {
+  document.getElementById('stat-mse').textContent = quality.mse.toFixed(3);
+  document.getElementById('stat-ssim').textContent = quality.ssim.toFixed(2);
+}
 
 function readPhoto(fileOrHandle) {
   const reader = new FileReader();
   reader.onload = () => {
+    photoBytes = reader.result;
     try {
-      photo = load_image(new Uint8Array(reader.result));
+      load_image(new Uint8Array(photoBytes));  // validate decode early
       drop.classList.add('loaded');
       drop.textContent = fileOrHandle.name;
       setStatus('photo loaded. set the sliders and wind.');
+      renderBtn.disabled = false;
+      createImageBitmap(fileOrHandle).then((bm) => {
+        const side = Math.min(bm.width, bm.height);
+        const sx = (bm.width - side) / 2;
+        const sy = (bm.height - side) / 2;
+        const ctx = original.getContext('2d');
+        ctx.clearRect(0, 0, original.width, original.height);
+        ctx.drawImage(bm, sx, sy, side, side, 0, 0, original.width, original.height);
+        document.getElementById('compare-row').hidden = false;
+      });
     } catch (e) {
+      photoBytes = null;
       setStatus('decode failed: ' + e.message, true);
     }
   };
@@ -285,55 +404,183 @@ document.getElementById('weight').addEventListener('input', e => {
   document.getElementById('weight-label').textContent =
     Number(e.target.value) === 0 ? 'off' : e.target.value;
 });
-for (const button of document.querySelectorAll('#layout button')) {
-  button.addEventListener('click', () => {
-    for (const other of document.querySelectorAll('#layout button')) {
-      other.setAttribute('aria-pressed', 'false');
-    }
-    button.setAttribute('aria-pressed', 'true');
-  });
-}
-function currentLayout() {
-  return document.querySelector('#layout button[aria-pressed="true"]').value;
-}
 
-function setStatus(message, error = false) {
-  status.textContent = message;
-  status.classList.toggle('error', error);
+function segment(id) {
+  for (const button of document.querySelectorAll(`#${id} button`)) {
+    button.addEventListener('click', () => {
+      for (const other of document.querySelectorAll(`#${id} button`)) {
+        other.setAttribute('aria-pressed', 'false');
+      }
+      button.setAttribute('aria-pressed', 'true');
+      if (id === 'palette') {
+        document.getElementById('palette-json').hidden = button.value !== 'custom';
+      }
+    });
+  }
+  return () => document.querySelector(`#${id} button[aria-pressed="true"]`).value;
+}
+const currentLayout = segment('layout');
+const currentPalette = segment('palette');
+
+// before/after slider: the original photo clips over the render
+const compareToggle = document.getElementById('compare-toggle');
+const compareSlider = document.getElementById('compare');
+compareToggle.addEventListener('change', () => {
+  compareSlider.disabled = !compareToggle.checked;
+  original.style.clipPath = compareToggle.checked
+    ? `inset(0 ${100 - Number(compareSlider.value)}% 0 0)` : 'inset(0 100% 0 0)';
+});
+compareSlider.addEventListener('input', () => {
+  original.style.clipPath = `inset(0 ${100 - Number(compareSlider.value)}% 0 0)`;
+});
+
+function collectOptions() {
+  const palette = currentPalette();
+  let paletteSpec = null;
+  let wb = false;
+  if (palette === 'wb') {
+    wb = true;
+  } else if (palette === 'custom') {
+    const text = document.getElementById('palette-json').value.trim();
+    JSON.parse(text);  // throws on malformed JSON, caught by the caller
+    paletteSpec = text;
+  } else if (palette !== 'bw') {
+    paletteSpec = palette;
+  }
+  return {
+    layout: currentLayout(),
+    step: Number(document.getElementById('step').value),
+    pulls: Number(document.getElementById('pulls').value),
+    strength: Number(document.getElementById('strength').value),
+    weight: Number(document.getElementById('weight').value),
+    palette: paletteSpec,
+    wb,
+  };
 }
 
 renderBtn.addEventListener('click', () => {
-  if (!photo) { setStatus('load a photo first.', true); return; }
-  const pulls = Number(document.getElementById('pulls').value);
-  const step = Number(document.getElementById('step').value);
-  const strength = Number(document.getElementById('strength').value);
-  const weight = Number(document.getElementById('weight').value);
-  const layout = currentLayout();
-  setStatus('searching...');
-  setTimeout(() => {
-    try {
-      const t0 = performance.now();
-      const art = generate(photo, layout, step, pulls, strength, weight > 0 ? weight : null);
-      const png = render_png(art, 600);
-      const blob = new Blob([png], { type: 'image/png' });
-      const ctx = canvas.getContext('2d');
-      createImageBitmap(blob).then(bm => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(bm, 0, 0);
-      });
-      download.href = URL.createObjectURL(blob);
-      download.hidden = false;
-      const seconds = ((performance.now() - t0) / 1000).toFixed(1);
-      // getter bindings surface as JS properties, not methods
-      document.getElementById('stat-pulls').textContent = art.pulls;
-      document.getElementById('stat-nails').textContent = art.nails_count;
-      document.getElementById('stat-time').textContent = seconds;
-      stats.classList.add('ready');
-      setStatus('done. wind it for real with the restring CLI.');
-    } catch (e) {
-      setStatus('render failed: ' + e.message, true);
-    }
-  }, 10);
+  if (!photoBytes) { setStatus('load a photo first.', true); return; }
+  let options;
+  try {
+    options = collectOptions();
+  } catch (e) {
+    setStatus('palette JSON is invalid: ' + e.message, true);
+    return;
+  }
+  lastOptions = options;
+  hideDownloads();
+  stats.classList.remove('ready');
+  setRunning(true);
+  progress.value = 0;
+  setStatus('winding...');
+  worker.postMessage({ type: 'start', bytes: photoBytes.slice(0), options });
+});
+
+cancelBtn.addEventListener('click', () => {
+  worker.postMessage({ type: 'cancel' });
+  setStatus('cancelling...');
+});
+
+function hideDownloads() {
+  for (const id of ['download', 'download-project', 'download-csv', 'download-txt',
+                    'download-poster', 'gif', 'download-gif', 'wind-it']) {
+    document.getElementById(id).hidden = true;
+  }
+}
+
+function buildProject(orders, options) {
+  const project = {
+    format: 'restring-project',
+    version: 2,
+    created: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    mode: orders.mode,
+    config: {
+      grid: 300, wb: !!orders.wb, nail_step: options.step, layout: options.layout,
+      pull_budget: options.pulls, weight: options.weight > 0 ? options.weight : null,
+      min_chord: null, random_nails: null, seed: null,
+    },
+    nails: orders.nails,
+    pull_orders: orders.orders,
+    input_digest: '',
+    restring_version: 'web-playground',
+  };
+  if (orders.palette) project.palette = orders.palette;
+  return project;
+}
+
+function offerDownloads(project, pngBlob) {
+  currentProject = project;
+  const setHref = (id, blob) => {
+    const link = document.getElementById(id);
+    link.href = URL.createObjectURL(blob);
+    link.hidden = false;
+  };
+  if (pngBlob) setHref('download', pngBlob);
+  setHref('download-project', new Blob([JSON.stringify(project)], { type: 'application/json' }));
+  setHref('download-csv', new Blob([windingCsv(project)], { type: 'text/csv' }));
+  setHref('download-txt', new Blob([windingTxt(project)], { type: 'text/plain' }));
+  try {
+    setHref('download-poster', new Blob([posterSvg(project, { preview: true })], { type: 'image/svg+xml' }));
+  } catch (e) {
+    setStatus('poster failed: ' + e.message, true);
+  }
+  const windIt = document.getElementById('wind-it');
+  windIt.hidden = false;
+  windIt.onclick = () => {
+    localStorage.setItem('restring-handoff', JSON.stringify(project));
+  };
+}
+
+function finishRun(msg) {
+  setRunning(false);
+  drawPng(msg.png, canvas);
+  const blob = new Blob([msg.png], { type: 'image/png' });
+  document.getElementById('stat-pulls').textContent = msg.pulls;
+  document.getElementById('stat-nails').textContent = msg.nails;
+  document.getElementById('stat-time').textContent = msg.seconds;
+  showQuality(msg.quality);
+  stats.classList.add('ready');
+  const project = buildProject(msg.orders, lastOptions);
+  offerDownloads(project, blob);
+  document.getElementById('gif').hidden = false;
+  setStatus(msg.type === 'cancelled'
+    ? `cancelled at ${msg.pulls} pulls. The partial winding is yours to save.`
+    : 'done. save the project, print the poster, or wind it step by step.');
+}
+
+document.getElementById('gif').addEventListener('click', () => {
+  const button = document.getElementById('gif');
+  button.disabled = true;
+  setStatus('encoding the GIF...');
+  worker.postMessage({ type: 'gif', size: 450, frames: 180 });
+});
+
+// load a saved .restring project: re-render without a search, export again
+document.getElementById('load-project').addEventListener('click', () => {
+  document.getElementById('project-file').click();
+});
+document.getElementById('project-file').addEventListener('change', async (e) => {
+  const handle = e.target.files[0];
+  if (!handle) return;
+  try {
+    const project = JSON.parse(await handle.text());
+    if (project.format !== 'restring-project') throw new Error('not a restring project');
+    hideDownloads();
+    const png = render_project(JSON.stringify(project), 600, 0);
+    drawPng(png, canvas);
+    document.getElementById('stat-pulls').textContent =
+      Math.max(...project.pull_orders.map(o => o.length - 1));
+    document.getElementById('stat-nails').textContent = project.nails.length;
+    document.getElementById('stat-time').textContent = '0.0';
+    document.getElementById('stat-mse').textContent = '–';
+    document.getElementById('stat-ssim').textContent = '–';
+    stats.classList.add('ready');
+    offerDownloads(project, new Blob([png], { type: 'image/png' }));
+    setStatus(`project loaded: ${handle.name}. re-rendered without a search.`);
+  } catch (err) {
+    setStatus('project load failed: ' + err.message, true);
+  }
+  e.target.value = '';
 });
 </script>
 </body>

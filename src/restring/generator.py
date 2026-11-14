@@ -34,10 +34,12 @@ class Config:
     export_strength: float | None = None
     pull_amount: int | None = None
     random_nails: int | None = None
+    seed: int | None = None
     radius1_multiplier: float = 1
     radius2_multiplier: float = 1
     wb: bool = False
     weight_peak: float | None = None
+    weight_map: str | None = None
     min_chord: float | None = None
     realistic: bool = False
     canvas_size: float = 400
@@ -61,7 +63,7 @@ def _thread_px(config: Config, side_len: int):
 
 
 def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, weights=None,
-               min_chord=None, rollback=False):
+               min_chord=None, rollback=False, seed=None):
     """Greedy pull-order search on a grayscale target Image (Rust core).
 
     `pic` is only used for its initial fill (white/black canvas). Returns
@@ -85,6 +87,31 @@ def create_art(nails, orig_pic, pic, strength, i_limit=None, random_nails=None, 
         weights,
         float(min_chord) if min_chord is not None else None,
         bool(rollback),
+        int(seed) if seed is not None else None,
+    )
+    return [int(i) for i in order], final
+
+
+def continue_art(nails, orig_pic, prev_order, strength, i_limit=None, random_nails=None,
+                 weights=None, min_chord=None, rollback=False, seed=None, white=True):
+    """Continue a finished pull order with more pulls on the same thread.
+
+    The core replays `prev_order` onto a fresh working canvas and resumes the
+    greedy search from its last nail. `i_limit` counts the new pulls only.
+    Returns (full order, final working canvas Image).
+    """
+    order, final = _core.continue_art(
+        [(int(r), int(c)) for r, c in nails],
+        orig_pic,
+        [int(i) for i in prev_order],
+        float(strength),
+        int(i_limit) if i_limit is not None else None,
+        int(random_nails) if random_nails is not None else None,
+        bool(white),
+        weights,
+        float(min_chord) if min_chord is not None else None,
+        bool(rollback),
+        int(seed) if seed is not None else None,
     )
     return [int(i) for i in order], final
 
@@ -108,23 +135,24 @@ def separate_targets(img, threads, shape):
     return [_core.Image.from_nested(m) for m in maps]
 
 
-def generate_palette(img, shape, nails, config: Config, threads):
-    # measured working strength 0.05: global color MSE improves 13 to 17
-    # percent over the old 0.1 on both portrait fixtures and grayscale SSIM
-    # rises (docs/research/rgb-channels-experiment.md)
-    strength = 0.05 if config.wb else -0.05
+def _weights(config: Config, shape):
+    if config.weight_map is not None:
+        from restring.image_transformations import resize
+        weights = _core.Image.load(str(config.weight_map)).gray(1.0)
+        logger.info(f"Importance weighting: map {config.weight_map}")
+        return resize(weights, shape)
+    if config.weight_peak is None:
+        return None
+    # sigma = side / 3 reproduces the measured sigma 100 on the 300 px
+    # grid, bg 0.5 (docs/research/alternatives-experiment.md)
+    sigma = max(shape) / 3
+    logger.info(f"Importance weighting: peak {config.weight_peak}, sigma {sigma:.1f}, bg 0.5")
+    return _core.gaussian_weights(shape[1], shape[0], sigma, config.weight_peak, 0.5)
 
-    # one greedy run per thread on a shared nail grid
-    orders = []
+
+def _render_palette(orders, shape, nails, config: Config, threads):
     exports = []
-    for target in separate_targets(img, threads, shape):
-        order, _ = create_art(nails, target,
-                              init_canvas(shape, black=config.wb), strength,
-                              i_limit=config.pull_amount,
-                              random_nails=config.random_nails,
-                              min_chord=config.min_chord,
-                              rollback=config.rollback)
-        orders.append(order)
+    for order in orders:
         magnitude = config.export_strength
         if magnitude is None:
             magnitude = resolve_export_strength(len(order) - 1)
@@ -150,6 +178,42 @@ def generate_palette(img, shape, nails, config: Config, threads):
     return result, orders
 
 
+def generate_palette(img, shape, nails, config: Config, threads):
+    # measured working strength 0.05: global color MSE improves 13 to 17
+    # percent over the old 0.1 on both portrait fixtures and grayscale SSIM
+    # rises (docs/research/rgb-channels-experiment.md)
+    strength = 0.05 if config.wb else -0.05
+
+    # one greedy run per thread on a shared nail grid
+    orders = []
+    for target in separate_targets(img, threads, shape):
+        order, _ = create_art(nails, target,
+                              init_canvas(shape, black=config.wb), strength,
+                              i_limit=config.pull_amount,
+                              random_nails=config.random_nails,
+                              min_chord=config.min_chord,
+                              rollback=config.rollback,
+                              seed=config.seed)
+        orders.append(order)
+    return _render_palette(orders, shape, nails, config, threads)
+
+
+def continue_palette(img, shape, nails, config: Config, threads, prev_orders):
+    """Continue each thread of a palette run from its stored pull order."""
+    strength = 0.05 if config.wb else -0.05
+    orders = []
+    for target, prev in zip(separate_targets(img, threads, shape), prev_orders):
+        order, _ = continue_art(nails, target, prev, strength,
+                                i_limit=config.pull_amount,
+                                random_nails=config.random_nails,
+                                min_chord=config.min_chord,
+                                rollback=config.rollback,
+                                seed=config.seed,
+                                white=not config.wb)
+        orders.append(order)
+    return _render_palette(orders, shape, nails, config, threads)
+
+
 def _run_palette(img, shape, nails, config: Config, threads):
     return generate_palette(img, shape, nails, config, threads)
 
@@ -160,24 +224,7 @@ def generate_rgb(img, shape, nails, config: Config):
     return _run_palette(img, shape, nails, config, palettes.builtin_palette("rgb"))
 
 
-def _run_bw(img, shape, nails, config: Config):
-    strength = 0.05 if config.wb else -0.05
-
-    target = img.gray(0.9)
-    weights = None
-    if config.weight_peak is not None:
-        # sigma = side / 3 reproduces the measured sigma 100 on the 300 px
-        # grid, bg 0.5 (docs/research/alternatives-experiment.md)
-        sigma = max(shape) / 3
-        weights = _core.gaussian_weights(shape[1], shape[0], sigma, config.weight_peak, 0.5)
-        logger.info(f"Importance weighting: peak {config.weight_peak}, sigma {sigma:.1f}, bg 0.5")
-    pull_order, _ = create_art(
-        nails, target, init_canvas(shape, black=config.wb), strength,
-        i_limit=config.pull_amount, random_nails=config.random_nails,
-        weights=weights, min_chord=config.min_chord,
-        rollback=config.rollback,
-    )
-
+def _render_bw(pull_order, shape, nails, config: Config):
     out_h = int(config.side_len * config.radius1_multiplier)
     out_w = int(config.side_len * config.radius2_multiplier)
     magnitude = config.export_strength
@@ -185,7 +232,7 @@ def _run_bw(img, shape, nails, config: Config):
         magnitude = resolve_export_strength(len(pull_order) - 1)
         logger.info(f"Export strength: {magnitude:.3f} (auto, {len(pull_order) - 1} pulls)")
     export = magnitude if config.wb else -magnitude
-    result = pull_order_to_array_bw(
+    return pull_order_to_array_bw(
         pull_order,
         init_canvas((out_h, out_w), black=config.wb),
         nails,
@@ -193,7 +240,30 @@ def _run_bw(img, shape, nails, config: Config):
         shape=shape,
         thread_px=_thread_px(config, config.side_len),
     )
-    return result, pull_order
+
+
+def _run_bw(img, shape, nails, config: Config):
+    strength = 0.05 if config.wb else -0.05
+    target = img.gray(0.9)
+    pull_order, _ = create_art(
+        nails, target, init_canvas(shape, black=config.wb), strength,
+        i_limit=config.pull_amount, random_nails=config.random_nails,
+        weights=_weights(config, shape), min_chord=config.min_chord,
+        rollback=config.rollback, seed=config.seed,
+    )
+    return _render_bw(pull_order, shape, nails, config), pull_order
+
+
+def _continue_bw(img, shape, nails, config: Config, prev_order):
+    strength = 0.05 if config.wb else -0.05
+    target = img.gray(0.9)
+    order, _ = continue_art(
+        nails, target, prev_order, strength,
+        i_limit=config.pull_amount, random_nails=config.random_nails,
+        weights=_weights(config, shape), min_chord=config.min_chord,
+        rollback=config.rollback, seed=config.seed, white=not config.wb,
+    )
+    return _render_bw(order, shape, nails, config), order
 
 
 def generate_bw(img, shape, nails, config: Config):

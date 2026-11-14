@@ -2,6 +2,8 @@
 
 The poster turns a finished result into physical work: numbered nails on a printed sheet, the winding sequence in your hand, and the thread length before you buy anything.
 
+For a guided session, the playground's [winding assistant](https://inzgiba.github.io/ReString/wind.html) loads the same `.restring` project and steps through it pull by pull: the board highlights the current chord with its nail numbers, arrow keys step, threads wind one after another, and the session survives a closed tab. The playground hands the finished project straight to the assistant via the "wind it step by step" link.
+
 ## From render to poster
 
 ```bash

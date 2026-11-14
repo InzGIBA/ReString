@@ -79,8 +79,79 @@ def test_rejects_wrong_order_arity(tmp_path):
 
 
 def test_rejects_unknown_format_version(tmp_path):
-    path = _mutate(tmp_path, lambda d: d.update(version=2))
+    path = _mutate(tmp_path, lambda d: d.update(version=3))
     with pytest.raises(ProjectError, match="version"):
+        load(path)
+
+
+def test_loads_version_1_files(tmp_path):
+    path = _mutate(tmp_path, lambda d: d.update(version=1))
+    proj = load(path)
+    assert proj.version == 1
+    assert proj.mode == "bw"
+    assert proj.palette is None
+
+
+def test_palette_round_trip_pixel_identical(tmp_path):
+    from restring.canvas import pull_order_to_array_palette
+    from restring.generator import generate_palette
+    from restring.palettes import builtin_palette
+
+    img = seeded_noise()
+    threads = builtin_palette("cmyk")
+    result, orders = generate_palette(img, SHAPE, NAILS,
+                                      Config(side_len=64, pull_amount=120, export_strength=0.1),
+                                      threads)
+    path = tmp_path / "p.restring"
+    save(path, mode="palette", config={"grid": 64, "wb": False}, nails=NAILS,
+         pull_orders=orders, input_digest="sha256:z", palette=threads)
+
+    proj = load(path)
+    assert proj.mode == "palette"
+    assert proj.version == 2
+    assert [t.name for t in proj.palette] == [t.name for t in threads]
+    assert [t.rgb for t in proj.palette] == [t.rgb for t in threads]
+    assert len(proj.pull_orders) == 4
+
+    rendered = pull_order_to_array_palette(proj.pull_orders, init_canvas((64, 64, 3)),
+                                           proj.nails, [t.rgb for t in proj.palette],
+                                           strength=[-0.1] * 4, shape=SHAPE)
+    assert np.array_equal(image_to_numpy(rendered), image_to_numpy(result))
+
+
+def test_palette_save_validates_arity(tmp_path):
+    from restring.palettes import builtin_palette
+
+    threads = builtin_palette("cmy")
+    with pytest.raises(ProjectError, match="one thread color per pull order"):
+        save(tmp_path / "p.restring", mode="palette", config={"grid": 64}, nails=NAILS,
+             pull_orders=[[0, 1], [0, 1]], input_digest="sha256:z", palette=threads)
+    with pytest.raises(ProjectError, match="needs a palette"):
+        save(tmp_path / "p.restring", mode="palette", config={"grid": 64}, nails=NAILS,
+             pull_orders=[[0, 1]], input_digest="sha256:z")
+    with pytest.raises(ProjectError, match="implicit colors"):
+        save(tmp_path / "p.restring", mode="bw", config={"grid": 64}, nails=NAILS,
+             pull_orders=[[0, 1]], input_digest="sha256:z", palette=threads)
+
+
+def test_palette_load_validates_colors(tmp_path):
+    from restring.palettes import builtin_palette
+
+    path = tmp_path / "p.restring"
+    save(path, mode="palette", config={"grid": 64}, nails=NAILS,
+         pull_orders=[[0, 1], [0, 1]], input_digest="sha256:z",
+         palette=builtin_palette("cmy")[:2])
+
+    data = json.loads(path.read_text())
+    data["palette"][0]["rgb"] = [1.5, 0.0, 0.0]
+    path.write_text(json.dumps(data))
+    with pytest.raises(ProjectError, match="0..1"):
+        load(path)
+
+    data = json.loads(path.read_text())
+    data["palette"] = data["palette"][:1]
+    path.write_text(json.dumps(data))
+    with pytest.raises(ProjectError, match="one color per pull order"):
         load(path)
 
 

@@ -9,7 +9,7 @@
 
 import { readFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
-import init, { load_image, generate, render_png } from '../web/pkg/restring_wasm.mjs';
+import init, { load_image, generate, render_png, WasmSearch, render_project } from '../web/pkg/restring_wasm.mjs';
 
 function crc32(buffer) {
   let table = crc32.table;
@@ -82,3 +82,63 @@ if (png.length < 1000) {
 }
 
 console.log(`wasm ok: ${art.pulls} pulls, ${art.nails_count} nails, ${png.length} png bytes`);
+
+// --- chunked search: the worker path -------------------------------------
+// same budget and strength as the one-shot run: chunking must not change
+// the winding, the greedy state carries across steps
+const chunked = new WasmSearch(photo, 'rect', 4, 300, 0.1, null, null, false);
+let chunks = 0;
+while (!chunked.finished) {
+  chunked.step(100);
+  chunks++;
+}
+if (chunked.pulls !== art.pulls) {
+  throw new Error(`chunked search diverged: ${chunked.pulls} pulls vs ${art.pulls}`);
+}
+const chunkedOrders = JSON.parse(chunked.orders_json());
+if (chunkedOrders.mode !== 'bw' || chunkedOrders.orders.length !== 1) {
+  throw new Error('chunked orders_json must carry one bw order');
+}
+const quality = JSON.parse(chunked.quality_json());
+if (!(quality.mse >= 0 && quality.ssim >= 0 && quality.ssim <= 1)) {
+  throw new Error('quality_json out of range: ' + JSON.stringify(quality));
+}
+console.log(`chunked ok: ${chunks} chunks, mse ${quality.mse}, ssim ${quality.ssim}`);
+
+// --- color search: cmyk palette, project round trip, GIF ------------------
+const color = new WasmSearch(photo, 'rect', 4, 200, 0, null, 'cmyk', false);
+while (!color.finished) color.step(100);
+const orders = JSON.parse(color.orders_json());
+if (orders.mode !== 'palette' || orders.orders.length !== 4 || orders.palette.length !== 4) {
+  throw new Error('cmyk search must carry four orders and four palette colors');
+}
+const colorPng = color.render_png(300);
+if (colorPng.length < 1000) {
+  throw new Error('color render_png produced too few bytes: ' + colorPng.length);
+}
+
+const project = {
+  format: 'restring-project', version: 2, mode: orders.mode,
+  config: { grid: 300, wb: false },
+  nails: orders.nails, pull_orders: orders.orders, palette: orders.palette,
+  input_digest: '', created: '', restring_version: 'smoke',
+};
+const projectPng = render_project(JSON.stringify(project), 300, 0);
+if (projectPng.length < 1000) {
+  throw new Error('render_project produced too few bytes: ' + projectPng.length);
+}
+
+const gif = color.animation_gif(120, 12);
+if (gif.length < 1000 || Buffer.from(gif.slice(0, 4)).toString('ascii') !== 'GIF8') {
+  throw new Error('animation_gif must produce GIF bytes, got ' + gif.length);
+}
+console.log(`color ok: ${color.pulls} pulls, ${colorPng.length} png bytes, ${gif.length} gif bytes`);
+
+// --- white on black --------------------------------------------------------
+const wb = new WasmSearch(photo, 'circle', 4, 100, 0, null, null, true);
+while (!wb.finished) wb.step(50);
+const wbOrders = JSON.parse(wb.orders_json());
+if (wbOrders.wb !== true || wbOrders.mode !== 'bw') {
+  throw new Error('wb search must report wb true and mode bw');
+}
+console.log(`wb ok: ${wb.pulls} pulls`);

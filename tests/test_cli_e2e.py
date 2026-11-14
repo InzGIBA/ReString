@@ -30,7 +30,10 @@ def test_parser_defaults():
     assert args.random_nails is None
     assert args.radius1_multiplier == 1
     assert args.radius2_multiplier == 1
-    assert args.nail_step == 4
+    assert args.nail_step is None  # resolved to 4 (or the preset) in main
+    assert args.seed is None
+    assert args.preset is None
+    assert args.batch is None
     assert args.weight_peak is None
     assert args.min_chord is None
     assert args.project is None
@@ -295,14 +298,44 @@ def test_cli_layout_aspect_crop(tmp_path):
     assert (tmp_path / "wide.png").exists()
 
 
-def test_cli_palette_project_out_rejected(tmp_path):
+def test_cli_palette_project_round_trip(tmp_path):
     rng = np.random.default_rng(2)
     input_file = tmp_path / "in.png"
     save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
 
-    with pytest.raises(SystemExit):
-        main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "60",
-              "--palette", "cmyk", "--project-out", str(tmp_path / "p.restring")])
+    main(["-i", str(input_file), "-o", str(tmp_path / "direct.png"), "-d", "40", "-l", "60",
+          "--palette", "cmyk", "--project-out", str(project_file)])
+    main(["--project", str(project_file), "-o", str(tmp_path / "rerender.png"), "-d", "40"])
+
+    assert np.array_equal(load_rgb(tmp_path / "direct.png"),
+                          load_rgb(tmp_path / "rerender.png"))
+    data = json.loads(project_file.read_text())
+    assert data["version"] == 2
+    assert data["mode"] == "palette"
+    assert [t["name"] for t in data["palette"]] == ["cyan", "magenta", "yellow", "black"]
+
+
+def test_cli_palette_poster_and_anim(tmp_path):
+    import xml.etree.ElementTree as ET
+
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
+    poster_file = tmp_path / "poster.svg"
+    anim_file = tmp_path / "wind.gif"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40", "-l", "60",
+          "--palette", "cmy", "--project-out", str(project_file),
+          "--poster", str(poster_file), "--poster-preview"])
+    svg = poster_file.read_text()
+    assert ET.fromstring(svg).tag.endswith("svg")
+    assert "Threads: 3 (cyan/magenta/yellow)" in svg
+
+    main(["--project", str(project_file), "-o", str(tmp_path / "out2.png"),
+          "--anim", str(anim_file), "--anim-frames", "10"])
+    assert anim_file.read_bytes()[:4] == b"GIF8"
 
 
 def test_cli_realistic_thread_width(tmp_path, caplog):
@@ -425,3 +458,124 @@ def test_cli_metrics_with_layout_aspect_crops_the_target(tmp_path):
 
     report = json.loads(metrics.read_text())
     assert report["mse"] >= 0.0
+
+
+# --- presets and batch mode ----------------------------------------------------
+
+def test_cli_preset_max_sets_nails_and_pulls(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40",
+          "--preset", "max", "--project-out", str(project_file)])
+
+    config = json.loads(project_file.read_text())["config"]
+    assert config["nail_step"] == 2
+    assert config["pull_budget"] == 3000
+
+
+def test_cli_explicit_flags_win_over_preset(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40",
+          "--preset", "max", "-n", "6", "-l", "25", "--project-out", str(project_file)])
+
+    config = json.loads(project_file.read_text())["config"]
+    assert config["nail_step"] == 6
+    assert config["pull_budget"] == 25
+
+
+def test_cli_preset_json_file(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    preset_file = tmp_path / "preset.json"
+    preset_file.write_text(json.dumps({"nail_step": 3, "pulls": 40}))
+    project_file = tmp_path / "p.restring"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40",
+          "--preset", str(preset_file), "--project-out", str(project_file)])
+
+    config = json.loads(project_file.read_text())["config"]
+    assert config["nail_step"] == 3
+    assert config["pull_budget"] == 40
+
+
+def test_cli_unknown_preset_is_a_clean_error(tmp_path):
+    input_file = tmp_path / "in.png"
+    save_image(input_file, np.full((32, 32), 0.4))
+
+    with pytest.raises(SystemExit) as e:
+        main(["-i", str(input_file), "-o", str(tmp_path / "o.png"), "--preset", "turbo"])
+    assert e.value.code == 2
+
+
+def test_cli_batch_processes_a_folder(tmp_path):
+    rng = np.random.default_rng(3)
+    batch_dir = tmp_path / "photos"
+    batch_dir.mkdir()
+    for name in ("a.png", "b.jpg"):
+        save_image(batch_dir / name, rng.random((36, 36, 3)))
+    (batch_dir / "notes.txt").write_text("ignored")
+    out_dir = tmp_path / "out"
+    proj_dir = tmp_path / "projects"
+    metrics_dir = tmp_path / "metrics"
+
+    main(["--batch", str(batch_dir), "-o", str(out_dir), "-d", "36", "-l", "25",
+          "--rect", "--project-out", str(proj_dir), "--metrics", str(metrics_dir)])
+
+    assert (out_dir / "a.png").exists()
+    assert (out_dir / "b.png").exists()
+    assert (proj_dir / "a.restring").exists()
+    assert (proj_dir / "b.restring").exists()
+    assert json.loads((metrics_dir / "a.json").read_text())["pulls"] >= 1
+    assert not (out_dir / "notes.png").exists()
+
+
+def test_cli_batch_validation(tmp_path):
+    batch_dir = tmp_path / "photos"
+    batch_dir.mkdir()
+    save_image(batch_dir / "a.png", np.full((32, 32), 0.4))
+
+    # -o must be a directory, not a file name
+    with pytest.raises(SystemExit):
+        main(["--batch", str(batch_dir), "-o", str(tmp_path / "out.png")])
+    # conflicts with -i
+    with pytest.raises(SystemExit):
+        main(["--batch", str(batch_dir), "-i", str(batch_dir / "a.png"),
+              "-o", str(tmp_path / "out")])
+    # empty directory
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(SystemExit):
+        main(["--batch", str(empty), "-o", str(tmp_path / "out")])
+
+
+def test_cli_random_nails_and_seed_reach_the_project(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+    project_file = tmp_path / "p.restring"
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "out.png"), "-d", "40",
+          "-l", "30", "-r", "12", "--seed", "7", "--project-out", str(project_file)])
+
+    config = json.loads(project_file.read_text())["config"]
+    assert config["random_nails"] == 12
+    assert config["seed"] == 7
+
+
+def test_cli_radius_multipliers_shape_the_export(tmp_path):
+    rng = np.random.default_rng(2)
+    input_file = tmp_path / "in.png"
+    save_image(input_file, rng.random((40, 40, 3)))
+
+    main(["-i", str(input_file), "-o", str(tmp_path / "tall.png"), "-d", "40",
+          "-l", "25", "-r1", "2", "-r2", "1"])
+
+    assert load_gray(tmp_path / "tall.png").shape == (80, 40)

@@ -23,8 +23,8 @@ def seeded_image():
 
 def test_all_exports_the_facade_plus_the_legacy_names():
     assert set(restring.__all__) == {
-        "Config", "GenerateOptions", "Result", "Stats", "generate",
-        "generate_bw", "generate_rgb",
+        "Config", "GenerateOptions", "Result", "Stats", "continue_project",
+        "generate", "generate_bw", "generate_rgb",
     }
 
 
@@ -42,13 +42,16 @@ def test_generate_options_fields_and_defaults():
         "min_chord": None, "rollback": False, "realistic": False,
         "canvas_size": 400.0, "thread_width": 0.2,
         "radius1_multiplier": 1.0, "radius2_multiplier": 1.0,
+        "random_nails": None, "seed": None,
+        "crop": None, "contrast": 1.0, "gamma": 1.0, "invert": False,
+        "weight_map": None, "max_threads": 8,
     }
     assert {f.name: f.default for f in fields} == expected
 
 
 def test_result_and_stats_fields():
     assert [f.name for f in dataclasses.fields(Result)] == [
-        "image", "pull_orders", "nails", "options", "stats"]
+        "image", "pull_orders", "nails", "options", "stats", "palette"]
     assert [f.name for f in dataclasses.fields(Stats)] == [
         "pulls_per_thread", "nails", "elapsed_s"]
 
